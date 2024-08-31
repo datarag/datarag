@@ -1,0 +1,10 @@
+node_modules
+config.local.json
+config.local.test.json
+public
+data
+coverage
+.nyc_output
+build
+postgres-data
+docker-compose.env
