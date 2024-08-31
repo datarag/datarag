@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datarag.ai API</title>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: "Quicksand", sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: black;
+            color: #dedede;
+            text-align: center;
+            padding: 50px 20px;
+            height: 100%;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin: 0;
+        }
+
+        .main-content {
+            text-align: center;
+        }
+
+        .main-content h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        .main-content p {
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+        }
+
+        .cta-buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .cta-buttons a {
+            text-decoration: none;
+            padding: 15px 30px;
+            font-size: 1rem;
+            color: rgb(0, 0, 0);
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .cta-learn-more {
+            background-color: #ffdd79;
+        }
+
+        .cta-api-docs {
+            background-color: #ffdd79;
+        }
+
+        .processing-animation {
+            width: 150px;
+            height: 150px;
+            margin: 30px auto;
+        }
+
+        @keyframes rotateClockwise {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes rotateCounterclockwise {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(-360deg);
+            }
+        }
+
+        .outer-circle {
+            fill: none;
+            stroke: url(#grad1);
+            stroke-width: 8;
+            transform-origin: 50% 50%;
+        }
+
+        .inner-circle {
+            fill: none;
+            stroke: url(#grad2);
+            stroke-width: 1;
+            animation: rotateCounterclockwise 1s linear infinite;
+            transform-origin: 50% 50%;
+        }
+
+        .footer {
+            background-color: #282c34;
+            color: white;
+            text-align: center;
+            padding: 10px 20px;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+        }
+
+        .footer p {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Datarag.ai · API service</h1>
+    </div>
+
+    <div class="main-content">
+        <h2>🟢 All systems operational</h2>
+        <p>AI is busy beefing up your data to dish out answers that actually make sense.</p>
+        <svg class="processing-animation" viewBox="0 0 100 100">
+            <defs>
+                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#000000;stop-opacity:0" />
+                </linearGradient>
+                <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#ffdd79;stop-opacity:0.5" />
+                    <stop offset="100%" style="stop-color:#ffdd79;stop-opacity:0.2" />
+                </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="40" class="outer-circle"/>
+            <circle cx="50" cy="50" r="20" class="inner-circle"/>
+        </svg>
+        <div class="cta-buttons">
+            <a href="https://datarag.ai" class="cta-learn-more">Learn More</a>
+            <a href="/docs" class="cta-api-docs">View API Docs</a>
+        </div>
+    </div>
+</body>
+</html>

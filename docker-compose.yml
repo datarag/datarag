@@ -1,0 +1,48 @@
+services:
+
+  datarag:
+    image: datarag-devel
+    env_file: docker-compose.env
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./src:/usr/app/src
+      - ./cli:/usr/app/cli
+      - ./tests:/usr/app/tests
+      - ./templates:/usr/app/templates
+      - ./postgres-data:/var/lib/postgresql
+    ports:
+      - "4100:4100"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - POSTGRES_CONNECT_URL=postgres://postgres:postgres@datarag-postgres:5432/datarag
+      - POSTGRES_TEST_CONNECT_URL=postgres://postgres:postgres@datarag-postgres:5432/test
+      - REDIS_CONNECT_URL=redis://datarag-redis:6379
+    depends_on:
+      datarag-redis:
+        condition: service_healthy
+      datarag-postgres:
+        condition: service_healthy
+
+  datarag-postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_HOST=datarag-postgres
+      - POSTGRES_DB=datarag
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "datarag", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  datarag-redis:
+    image: redis:7.0.0
+    command: redis-server
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

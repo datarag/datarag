@@ -1,0 +1,38 @@
+{
+  "extends": [
+    "airbnb-base"
+  ],
+
+  "env": {
+    "node": true,
+    "es6": true
+  },
+
+  "ignorePatterns": [
+    "node_modules/**"
+  ],
+
+  "globals": {
+    "afterAll": false,
+    "afterEach": false,
+    "beforeAll": false,
+    "beforeEach": false,
+    "describe": false,
+    "expect": false,
+    "it": false,
+    "jest": false
+  },
+
+  "rules": {
+    "no-prototype-builtins": "off",
+    "import/no-unresolved": "off",
+    "no-param-reassign": "off",
+    "prefer-destructuring": "off",
+    "no-restricted-syntax": "off",
+    "strict": "off",
+    "func-names": "off",
+    "arrow-body-style": "off",
+    "no-await-in-loop": "off",
+    "no-continue": "off"
+  }
+}

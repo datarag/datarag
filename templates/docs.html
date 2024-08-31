@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Datarag API Docs</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet" />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="redoc-container"></div>
+    <script type="text/javascript" src="https://unpkg.com/redoc@2.1.4/bundles/redoc.standalone.js"></script>
+  </body>
+  <script type="text/javascript">
+    Redoc.init(
+      '/docs/v1/swagger.json',
+      {},
+      document.getElementById("redoc-container")
+    );
+  </script>
+</html>
