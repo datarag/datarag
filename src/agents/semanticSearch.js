@@ -33,7 +33,6 @@ async function semanticSearch({
   `, {
     type: db.sequelize.QueryTypes.SELECT,
     replacements: {
-      query,
       orgid: organizationId,
       dsids: datasourceIds,
       vector: pgvector.toSql(queryVector),
@@ -58,7 +57,6 @@ async function semanticSearch({
     `, {
       model: db.Chunk,
       replacements: {
-        query,
         orgid: organizationId,
         dsids: datasourceIds,
         vector: pgvector.toSql(queryVector),
