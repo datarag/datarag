@@ -18,28 +18,28 @@ _build:
 		-t ${TARGET_IMAGE}:${TARGET_TAG} .
 
 migrate:
-	docker-compose run --rm datarag npm run migrate
+	docker compose run --rm datarag npm run migrate
 
 migrate_undo:
-	docker-compose run --rm datarag npm run migrate_undo
+	docker compose run --rm datarag npm run migrate_undo
 
 up:
-	docker-compose up
+	docker compose up
 
 test:
-	docker-compose run --rm datarag npm test
+	docker compose run --rm datarag npm test
 
 eslint:
-	docker-compose run --rm datarag npm run eslint
+	docker compose run --rm datarag npm run eslint
 
 stop:
-	docker-compose stop
+	docker compose stop
 
 shell:
-	docker-compose run --rm datarag sh
+	docker compose run --rm datarag sh
 
 dbshell:
-	docker-compose run --rm datarag psql postgres://postgres:postgres@datarag-postgres:5432/datarag
+	docker compose run --rm datarag psql postgres://postgres:postgres@datarag-postgres:5432/datarag
 
 delete:
-	docker-compose down --rmi local -v
+	docker compose down --rmi local -v

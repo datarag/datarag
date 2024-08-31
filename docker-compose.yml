@@ -2,7 +2,9 @@ services:
 
   datarag:
     image: datarag-devel
-    env_file: docker-compose.env
+    env_file:
+      - path: docker-compose.env
+        required: false
     stdin_open: true
     tty: true
     volumes:
