@@ -56,14 +56,16 @@ nconf.set('raglog:enabled', getEnvironment('DATARAG_RAGLOG_ENABLED', true));
 nconf.set('costlog:enabled', getEnvironment('DATARAG_COSTLOG_ENABLED', true));
 
 // Validate
-if (!nconf.get('secrets:openai_api_key')) {
-  throw new Error('Please set DATARAG_OPENAI_API_KEY environment variable');
-}
-if (!nconf.get('secrets:cohere_api_key')) {
-  throw new Error('Please set DATARAG_COHERE_API_KEY environment variable');
-}
-if (!nconf.get('secrets:api_token_salt')) {
-  throw new Error('Please set DATARAG_API_TOKEN_SALT environment variable');
+if (process.env.NODE_ENV === 'production') {
+  if (!nconf.get('secrets:openai_api_key')) {
+    throw new Error('Please set DATARAG_OPENAI_API_KEY environment variable');
+  }
+  if (!nconf.get('secrets:cohere_api_key')) {
+    throw new Error('Please set DATARAG_COHERE_API_KEY environment variable');
+  }
+  if (!nconf.get('secrets:api_token_salt')) {
+    throw new Error('Please set DATARAG_API_TOKEN_SALT environment variable');
+  }
 }
 
 module.exports = nconf;

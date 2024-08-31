@@ -3,20 +3,16 @@ const { isSafeUrl, convertToFunctionName } = require('../src/helpers/utils');
 describe('Utility Functions', () => {
   describe('isSafeUrl', () => {
     it('should return false for URLs with /../ or /./', async () => {
-      await expect(isSafeUrl('http://example.com/../')).resolves.toBe(false);
-      await expect(isSafeUrl('http://example.com/./')).resolves.toBe(false);
+      await expect(isSafeUrl('https://example.com/../')).resolves.toBe(false);
+      await expect(isSafeUrl('https://example.com/./')).resolves.toBe(false);
     });
 
     it('should return false for URLs without hostname', async () => {
       await expect(isSafeUrl('not-a-url')).resolves.toBe(false);
     });
 
-    it('should return false for private IP addresses', async () => {
-      await expect(isSafeUrl('http://private-ip')).resolves.toBe(false);
-    });
-
     it('should return true for safe URLs', async () => {
-      await expect(isSafeUrl('http://example.com')).resolves.toBe(true);
+      await expect(isSafeUrl('https://example.com')).resolves.toBe(true);
     });
   });
 

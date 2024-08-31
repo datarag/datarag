@@ -1,0 +1,14 @@
+name: Run tests
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - run: make build_dev
+    - run: make eslint
+    - run: make test

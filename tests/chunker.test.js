@@ -294,7 +294,7 @@ describe('flattenText', () => {
   });
 
   it('should remove inline links', () => {
-    const text = 'Some [linked text](http://example.com)';
+    const text = 'Some [linked text](https://example.com)';
     const expected = 'Some linked text';
     const result = flattenText(text);
     expect(result).toBe(expected);
@@ -308,7 +308,7 @@ describe('flattenText', () => {
   });
 
   it('should remove reference-style links', () => {
-    const text = 'Some text\n\n[1]: http://example.com';
+    const text = 'Some text\n\n[1]: https://example.com';
     const expected = 'Some text';
     const result = flattenText(text);
     expect(result).toBe(expected);
@@ -431,7 +431,7 @@ describe('chunkifyMarkdown', () => {
   it('should handle markdown with various elements correctly', () => {
     const markdownText = `
       # Header 1
-      This paragraph has multiple elements including **bold text**, _italic text_, and [a link](http://example.com). It also has some code \`inline code\` and a list:
+      This paragraph has multiple elements including **bold text**, _italic text_, and [a link](https://example.com). It also has some code \`inline code\` and a list:
       - Item 1
       - Item 2
 
