@@ -209,7 +209,7 @@ module.exports = (router) => {
   *         schema:
   *           type: string
    *     requestBody:
-   *       description: Document to be created
+   *       description: Document to be created.
    *       required: true
    *       content:
    *         application/json:

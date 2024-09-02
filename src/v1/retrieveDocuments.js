@@ -56,7 +56,7 @@ module.exports = (router) => {
   *       Return relevant documents for search functionality.
   *       You may query a agent, a set of datasources, or both.
   *     requestBody:
-  *       description: Query properties
+  *       description: Query properties.
   *       required: true
   *       content:
   *         application/json:
@@ -86,15 +86,15 @@ module.exports = (router) => {
   *                   properties:
   *                     processing_time_ms:
   *                        type: integer
-  *                        description: Time required to process the request in milliseconds
+  *                        description: Time required to process the request in milliseconds.
   *                        example: 752
   *                     query:
   *                        type: string
-  *                        description: The initial requested query
+  *                        description: The initial requested query.
   *                        example: 'What is machine learning?'
   *                     transaction_id:
   *                        type: string
-  *                        description: A transaction identifier
+  *                        description: A transaction identifier.
   *                        example: fhxJfds-1jv
   *                     snippets:
   *                        type: array

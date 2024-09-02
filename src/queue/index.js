@@ -5,6 +5,10 @@ const queue = new Queue(`${process.env.NODE_ENV}:default`, {
   createClient: () => createClient(),
 });
 
+const cron = new Queue(`${process.env.NODE_ENV}:cron`, {
+  createClient: () => createClient(),
+});
+
 /**
  * Get queue object
  *
@@ -12,6 +16,15 @@ const queue = new Queue(`${process.env.NODE_ENV}:default`, {
  */
 function getQueue() {
   return queue;
+}
+
+/**
+ * Get cron
+ *
+ * @return {*}
+ */
+function getCron() {
+  return cron;
 }
 
 /**
@@ -24,6 +37,25 @@ function getQueue() {
 async function addJob(jobId, payload) {
   await queue.add(payload, {
     jobId,
+    removeOnComplete: true,
+    removeOnFail: true,
+  });
+}
+
+/**
+ * Add a cron job in the queue system. If jobId already exists, job will be
+ * discarded.
+ *
+ * @param {String} jobId
+ * @param {Object} payload
+ * @param {String} schedule
+ */
+async function addCron(jobId, payload, schedule) {
+  await cron.add(payload, {
+    jobId,
+    repeat: {
+      cron: schedule,
+    },
     removeOnComplete: true,
     removeOnFail: true,
   });
@@ -51,7 +83,9 @@ async function countJobs() {
 
 module.exports = {
   getQueue,
+  getCron,
   addJob,
+  addCron,
   hasJob,
   countJobs,
 };
