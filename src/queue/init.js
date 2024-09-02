@@ -1,5 +1,5 @@
 const logger = require('../logger');
-const { getQueue } = require('./index');
+const { getQueue, addCron, getCron } = require('./index');
 const Worker = require('./worker');
 
 let isInitialized = false;
@@ -13,6 +13,14 @@ async function initializeQueue() {
   isInitialized = true;
   logger.info('worker', `Starting ${NUM_WORKERS} workers`);
   getQueue().process(NUM_WORKERS, Worker);
+
+  logger.info('worker', 'Starting cron');
+  getCron().process(1, Worker);
+
+  // Add cron jobs
+  addCron('cron:clean_raglog', {
+    type: 'clean_raglog',
+  }, '0 0 * * *');
 }
 
 module.exports = {

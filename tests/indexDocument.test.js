@@ -1,6 +1,6 @@
 const fs = require('fs');
 const { setupOrg, tearDownOrg, waitWorker } = require('./factory');
-const indexDocument = require('../src/workers/indexDocument');
+const indexDocument = require('../src/queue/jobs/indexDocument');
 
 const TOKEN = 'org1';
 const OTHER_TOKEN = 'other';

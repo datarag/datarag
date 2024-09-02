@@ -1,5 +1,6 @@
 const logger = require('../logger');
-const indexDocument = require('../workers/indexDocument');
+const indexDocument = require('./jobs/indexDocument');
+const cleanRagLog = require('./jobs/cleanRagLog');
 
 function Worker(job) {
   const proc = async () => {
@@ -9,6 +10,8 @@ function Worker(job) {
       const { data } = job;
       if (data.type === 'index') {
         await indexDocument(data);
+      } else if (data.type === 'clean_raglog') {
+        await cleanRagLog();
       }
     } catch (e) {
       logger.warn('worker', `Failed to process job ${job.id}`);

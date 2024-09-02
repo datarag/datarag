@@ -236,7 +236,7 @@ module.exports = (router) => {
   *         schema:
   *           type: string
    *     requestBody:
-   *       description: Connector to be created
+   *       description: Connector to be created.
    *       required: true
    *       content:
    *         application/json:

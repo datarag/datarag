@@ -148,7 +148,7 @@ module.exports = (router) => {
    *       You may define the id or leave empty and a random unique id will
    *       be associated with the datasource.
    *     requestBody:
-   *       description: Datasource to be created
+   *       description: Datasource to be created.
    *       required: true
    *       content:
    *         application/json:
@@ -301,7 +301,7 @@ module.exports = (router) => {
   *         schema:
   *           type: string
   *     requestBody:
-  *       description: Datasource data to update
+  *       description: Datasource data to update.
   *       required: true
   *       content:
   *         application/json:

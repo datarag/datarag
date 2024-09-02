@@ -301,7 +301,7 @@ module.exports = (router) => {
   *         schema:
   *           type: string
   *     requestBody:
-  *       description: Agent data to update
+  *       description: Agent data to update.
   *       required: true
   *       content:
   *         application/json:
@@ -554,7 +554,7 @@ module.exports = (router) => {
   *         schema:
   *           type: string
   *     requestBody:
-  *       description: Datasource id to add
+  *       description: Datasource id to add.
   *       required: true
   *       content:
   *         application/json:
@@ -649,7 +649,7 @@ module.exports = (router) => {
   *         schema:
   *           type: string
   *     requestBody:
-  *       description: Datasource id to remove from agent
+  *       description: Datasource id to remove from agent.
   *       required: true
   *       content:
   *         application/json:

@@ -115,6 +115,9 @@ A Connector is an API spec that is used to retrieve data from a third-party app 
     }, {
       name: 'Generative AI',
       description: 'API οperations for Retrieval Augmented Generation.',
+    }, {
+      name: 'Reports & Logs',
+      description: 'API οperations for generating reports and querying logs.',
     }],
   },
   apis: ['./src/v1/**/*.js'],
