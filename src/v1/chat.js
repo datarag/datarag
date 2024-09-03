@@ -504,6 +504,13 @@ and correct them if needed, while maintaining the meaning, formatting, and style
 
 ---
 
+# Task 4: Translation
+
+Detect the language of the input question and the produced answer. If the language is different,
+try to translate the answer to match the user's language.
+
+---
+
 User input question:
 ${payload.query}`;
       }
