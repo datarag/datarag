@@ -2,11 +2,8 @@ const _ = require('lodash');
 const { OpenAI } = require('openai');
 const config = require('../config');
 const logger = require('../logger');
-const md5 = require('../helpers/md5');
-const registry = require('../registry');
 
 const OPENAI_API_KEY = config.get('secrets:openai_api_key');
-const PROMPT_CACHE_SEC = config.get('prompt:caching:sec');
 const MODELS = [
   {
     model: 'gpt-4o-mini',
@@ -126,19 +123,9 @@ ${text}
     response_format: { type: 'json_object' },
   };
 
-  // Check if we have a response in Redis
-  const cacheKey = `prompt:${md5(JSON.stringify(promptPayload))}`;
-  let content = await registry.get(cacheKey);
-  if (content) {
-    return {
-      ...content,
-      costUSD: 0,
-    };
-  }
-
   // No cache, recreate it
   const completion = await completionBackoff(promptPayload);
-  content = completion.content;
+  const content = completion.content;
 
   const json = JSON.parse(content);
 
@@ -147,9 +134,6 @@ ${text}
     context: json.context,
     costUSD: completion.costUSD,
   };
-
-  // Cache it
-  await registry.set(cacheKey, response, PROMPT_CACHE_SEC);
 
   return response;
 }
@@ -204,27 +188,14 @@ ${text}
     response_format: { type: 'json_object' },
   };
 
-  // Check if we have a response in Redis
-  const cacheKey = `prompt:${md5(JSON.stringify(promptPayload))}`;
-  let content = await registry.get(cacheKey);
-  if (content) {
-    return {
-      ...content,
-      costUSD: 0,
-    };
-  }
-
   // No cache, recreate it
   const completion = await completionBackoff(promptPayload);
-  content = completion.content;
+  const content = completion.content;
 
   const response = {
     questions: JSON.parse(content).questions,
     costUSD: completion.costUSD,
   };
-
-  // Cache it
-  await registry.set(cacheKey, response, PROMPT_CACHE_SEC);
 
   return response;
 }
