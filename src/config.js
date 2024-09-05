@@ -45,7 +45,6 @@ nconf.set('queue:name', getEnvironment('DATARAG_QUEUE_NAME', 'index'));
 nconf.set('queue:workers', getEnvironment('DATARAG_QUEUE_WORKERS', 2));
 
 nconf.set('api:payload:maxsize', getEnvironment('DATARAG_API_PAYLOAD_MAXSIZE', '50mb'));
-nconf.set('prompt:caching:sec', getEnvironment('DATARAG_PROMPT_CACHING_SEC', 3600)); // 1 hour
 
 nconf.set('retrieval:embeddings:threshold', getEnvironment('DATARAG_RETRIEVAL_EMBEDDINGS_THRESHOLD', 0.5));
 nconf.set('retrieval:rerank:threshold', getEnvironment('DATARAG_RETRIEVAL_EMBEDDINGS_THRESHOLD', 0.2));
