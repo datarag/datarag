@@ -2,6 +2,7 @@ const zlib = require('zlib');
 const _ = require('lodash');
 const { apiRoute, notFoundResponse } = require('../helpers/responses');
 const db = require('../db/models');
+const { serializeDocument, serializeDatasource } = require('../helpers/serialize');
 
 const { Op } = db.Sequelize;
 
@@ -33,16 +34,40 @@ module.exports = (router) => {
   *           items:
   *             type: object
   *             properties:
-  *               chunk_id:
+  *               chunk_ref:
   *                 type: string
   *                 example: '536'
-  *                 description: The id of the chunk.
+  *                 description: The ref id of the chunk.
   *               text:
   *                 type: string
   *                 example: |
   *                   Machine learning is a subset of artificial intelligence that involves
   *                   the use of algorithms and statistical models.
   *                 description: The text content of the chunk.
+  *         documents:
+  *           type: array
+  *           description: A list of documents referenced in the rag_log object.
+  *           items:
+  *             type: object
+  *             properties:
+  *               document_ref:
+  *                 type: string
+  *                 example: '536'
+  *                 description: The ref id of the document
+  *               document:
+  *                 $ref: '#/components/schemas/Document'
+  *         datasources:
+  *           type: array
+  *           description: A list of datasources referenced in the rag_log object.
+  *           items:
+  *             type: object
+  *             properties:
+  *               datasource_ref:
+  *                 type: string
+  *                 example: '536'
+  *                 description: The ref id of the datasource
+  *               datasource:
+  *                 $ref: '#/components/schemas/Document'
   */
 
   /**
@@ -125,23 +150,52 @@ module.exports = (router) => {
 
       const data = JSON.parse(decompressedData.toString());
 
-      // Find relevant chunks
-      let chunksIds = {};
+      // Find relevant refs
+      let chunksRefs = {};
+      let documentRefs = {};
+      let datasourceRefs = {};
       function locateChunks(node) {
-        if (!node) return;
-        if (node.dt && node.dt.chunk_id) {
-          chunksIds[node.dt.chunk_id] = true;
+        if (!node || !node.dt) return;
+        if (node.dt.chunk_ref) {
+          chunksRefs[node.dt.chunk_ref] = true;
+        }
+        if (node.dt.document_ref) {
+          documentRefs[node.dt.document_ref] = true;
+        }
+        if (node.dt.datasource_ref) {
+          datasourceRefs[node.dt.datasource_ref] = true;
         }
         _.each(node.cld, (child) => locateChunks(child));
       }
       locateChunks(data);
 
-      chunksIds = _.keys(chunksIds);
+      chunksRefs = _.keys(chunksRefs);
+      documentRefs = _.keys(documentRefs);
+      datasourceRefs = _.keys(datasourceRefs);
+
       const chunks = await db.Chunk.findAll({
         where: {
           OrganizationId: req.organization.id,
           id: {
-            [Op.in]: chunksIds,
+            [Op.in]: chunksRefs,
+          },
+        },
+      });
+
+      const documents = await db.Document.findAll({
+        where: {
+          OrganizationId: req.organization.id,
+          id: {
+            [Op.in]: documentRefs,
+          },
+        },
+      });
+
+      const datasources = await db.Datasource.findAll({
+        where: {
+          OrganizationId: req.organization.id,
+          id: {
+            [Op.in]: datasourceRefs,
           },
         },
       });
@@ -150,8 +204,16 @@ module.exports = (router) => {
         data: {
           rag_log: data,
           chunks: _.map(chunks, (model) => ({
-            chunk_id: model.id,
+            chunk_ref: model.id,
             text: model.content,
+          })),
+          documents: _.map(documents, (model) => ({
+            document_ref: model.id,
+            document: serializeDocument(model),
+          })),
+          datasources: _.map(datasources, (model) => ({
+            datasource_ref: model.id,
+            datasource: serializeDatasource(model),
           })),
         },
       });

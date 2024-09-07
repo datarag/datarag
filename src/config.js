@@ -51,9 +51,9 @@ nconf.set('retrieval:rerank:threshold', getEnvironment('DATARAG_RETRIEVAL_EMBEDD
 
 // Logs
 nconf.set('auditlog:enabled', getEnvironment('DATARAG_AUDITLOG_ENABLED', true));
-nconf.set('raglog:enabled', getEnvironment('DATARAG_RAGLOG_ENABLED', true));
 nconf.set('costlog:enabled', getEnvironment('DATARAG_COSTLOG_ENABLED', true));
-nconf.set('raglog:retentiondays', getEnvironment('DATARAG_RAGLOG_RETENTIONDAYS', 14));
+nconf.set('raglog:enabled', getEnvironment('DATARAG_RAGLOG_ENABLED', true));
+nconf.set('raglog:retentiondays', getEnvironment('DATARAG_RAGLOG_RETENTIONDAYS', 3));
 
 // Validate
 if (process.env.NODE_ENV === 'production') {
