@@ -4,6 +4,7 @@ const supertest = require('supertest');
 const { app } = require('../src/server');
 const { setupOrg, tearDownOrg } = require('./factory');
 const db = require('../src/db/models');
+const { serializeDocument, serializeDatasource } = require('../src/helpers/serialize');
 
 const TOKEN = 'org1';
 
@@ -29,7 +30,11 @@ describe('Transactions API', () => {
 
     // Create a sample RagLog with a compressed log for testing
     const sampleLog = JSON.stringify({
-      dt: { chunk_id: chunk.id },
+      dt: {
+        chunk_ref: chunk.id,
+        document_ref: chunk.DocumentId,
+        datasource_ref: chunk.DatasourceId,
+      },
       cld: [],
     });
     const compressedLog = zlib.brotliCompressSync(sampleLog);
@@ -60,12 +65,24 @@ describe('Transactions API', () => {
       expect(res.statusCode).toEqual(200);
       expect(res.body.data).toEqual({
         rag_log: {
-          dt: { chunk_id: chunk.id },
+          dt: {
+            chunk_ref: chunk.id,
+            datasource_ref: chunk.DatasourceId,
+            document_ref: chunk.DocumentId,
+          },
           cld: [],
         },
         chunks: [{
-          chunk_id: chunk.id,
+          chunk_ref: chunk.id,
           text: 'This is the text content of chunk1',
+        }],
+        documents: [{
+          document_ref: chunk.DocumentId,
+          document: serializeDocument(factory.document),
+        }],
+        datasources: [{
+          datasource_ref: chunk.DatasourceId,
+          datasource: serializeDatasource(factory.datasource),
         }],
       });
     });

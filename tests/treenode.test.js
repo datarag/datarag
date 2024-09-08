@@ -3,7 +3,13 @@ const { TreeNode } = require('../src/helpers/treenode');
 describe('TreeNode', () => {
   it('should create a TreeNode with data', () => {
     const node = new TreeNode({ name: 'Root' });
-    expect(node.dt).toEqual({ name: 'Root' });
+    node.appendData({
+      foo: 'bar',
+    });
+    expect(node.dt).toEqual({
+      name: 'Root',
+      foo: 'bar',
+    });
     expect(node.cld).toEqual([]);
   });
 
@@ -42,6 +48,8 @@ describe('TreeNode', () => {
 
   it('should serialize a TreeNode to JSON', () => {
     const root = new TreeNode({ name: 'Root' });
+    root.msec = 100;
+
     const child = new TreeNode({ name: 'Child 1' });
 
     root.addChild(child);
@@ -50,6 +58,7 @@ describe('TreeNode', () => {
 
     expect(json).toEqual({
       dt: { name: 'Root' },
+      msec: 100,
       cld: [
         {
           dt: { name: 'Child 1' },
@@ -62,6 +71,7 @@ describe('TreeNode', () => {
   it('should deserialize a JSON object into a TreeNode', () => {
     const json = {
       dt: { name: 'Root' },
+      msec: 100,
       cld: [
         {
           dt: { name: 'Child 1' },
@@ -73,6 +83,7 @@ describe('TreeNode', () => {
     const root = TreeNode.fromJSON(json);
 
     expect(root.dt).toEqual({ name: 'Root' });
+    expect(root.msec).toEqual(100);
     expect(root.cld.length).toBe(1);
     expect(root.cld[0].dt).toEqual({ name: 'Child 1' });
   });

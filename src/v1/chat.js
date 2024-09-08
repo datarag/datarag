@@ -183,11 +183,12 @@ module.exports = (router) => {
 
       // Initiate RAG log object
       const ragLog = new TreeNode({
-        type: 'chat:request',
+        type: 'chat',
         provider,
         timestamp: now,
         request: payload,
       });
+      ragLog.startMeasure();
       req.ragLog = ragLog;
 
       // Find instructions
@@ -207,17 +208,16 @@ module.exports = (router) => {
       instructions += `\nToday is ${dayjs().format('dddd, MMMM DD, YYYY HH:mm:ss')}.\nDo not use any prior knowledge.`;
 
       // Add instructions to RAG log
-      ragLog.addChild(new TreeNode({
-        type: 'instructions',
+      ragLog.appendData({
         instructions,
-      }));
+      });
 
       // Filter out datasources
 
       const datasourceIds = await findDatasourceIds({
         organization: req.organization,
-        agentId: payload.agent_id,
-        datasourceIds: payload.datasource_ids,
+        agentResId: payload.agent_id,
+        datasourceResIds: payload.datasource_ids,
       });
       log(`Found ${datasourceIds.length} datasources`);
 
@@ -254,7 +254,6 @@ module.exports = (router) => {
       const toolNameHash = {
         searchKnowledgebase: true,
       };
-      const toolRagLogHash = {};
       const tools = [];
       const searchDataSourceIds = [];
       await Promise.all(_.map(datasourceIds, async (datasourceId) => {
@@ -288,13 +287,14 @@ module.exports = (router) => {
               log(`Calling tool API ${connector.endpoint} [${connector.method}]`);
 
               // Add connector request to RAG log
-              const reqRagLog = (toolRagLogHash[fnName] || ragLog).addChild(new TreeNode({
-                type: 'connector:request',
+              const reqRagLog = ragLog.addChild(new TreeNode({
+                type: 'connector',
                 name: connector.name,
                 method: connector.method,
                 endpoint: connector.endpoint,
-                body: { data: args },
+                request: { data: args },
               }));
+              reqRagLog.startMeasure();
 
               // Make the actual request
               const response = await axios({
@@ -309,11 +309,13 @@ module.exports = (router) => {
               logger.debug('connector:response', response.data);
 
               // Add connector response to RAG log
-              reqRagLog.addChild(new TreeNode({
-                type: 'connector:response',
-                status: response.status,
-                data: response.data,
-              }));
+              reqRagLog.appendData({
+                response: {
+                  status: response.status,
+                  data: response.data,
+                },
+              });
+              reqRagLog.endMeasure();
 
               if (_.isArray(response.data.data)) {
                 log(`Received ${connector.endpoint} [${connector.method}]: ${response.data.data.length} data`);
@@ -369,15 +371,6 @@ module.exports = (router) => {
               },
             },
           });
-
-          // Add function to Rag Log
-          toolRagLogHash[fnName] = ragLog.addChild(new TreeNode({
-            type: 'function',
-            name: fnName,
-            purpose: connector.purpose,
-            properties,
-            required,
-          }));
         });
       }));
 
@@ -392,7 +385,7 @@ module.exports = (router) => {
           maxTokens: payload.max_tokens,
           maxChars: payload.max_chars,
           maxChunks: payload.max_chunks,
-          ragLog: toolRagLogHash.searchKnowledgebase,
+          ragLog,
         });
         queryCostUSD += costUSD;
         logger.debug('datasource:response', `${chunks.length} retrieved`);
@@ -426,15 +419,6 @@ module.exports = (router) => {
           },
         };
         tools.push(fields);
-
-        // Add function to Rag Log
-        toolRagLogHash[fields.function.function.name] = ragLog.addChild(new TreeNode({
-          type: 'function',
-          name: fields.function.function.name,
-          purpose: fields.function.description,
-          properties: fields.function.parameters.properties,
-          required: fields.function.parameters.required,
-        }));
       }
 
       async function streamFn(text) {
@@ -452,10 +436,9 @@ module.exports = (router) => {
       const prevMessages = conversation ? conversation.history.messages : [];
 
       if (!_.isEmpty(prevMessages)) {
-        ragLog.addChild(new TreeNode({
-          type: 'memory',
-          messages_count: prevMessages.length,
-        }));
+        ragLog.appendData({
+          prev_messages_count: prevMessages.length,
+        });
       }
 
       if (_.isEmpty(prevMessages) && instructions) {
@@ -566,10 +549,10 @@ ${payload.query}`;
         },
       };
 
-      ragLog.addChild(new TreeNode({
-        type: 'chat:response',
+      ragLog.appendData({
         response: finalResponse,
-      }));
+      });
+      ragLog.endMeasure();
 
       req.transactionAction = 'chat';
       req.transactionCostUSD = queryCostUSD;

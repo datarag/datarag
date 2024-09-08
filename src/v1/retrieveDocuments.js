@@ -126,8 +126,8 @@ module.exports = (router) => {
 
       const datasourceIds = await findDatasourceIds({
         organization: req.organization,
-        agentId: payload.agent_id,
-        datasourceIds: payload.datasource_ids,
+        agentResId: payload.agent_id,
+        datasourceResIds: payload.datasource_ids,
       });
 
       if (_.isEmpty(datasourceIds)) {
@@ -137,10 +137,11 @@ module.exports = (router) => {
 
       // Initiate Rag log object
       const ragLog = new TreeNode({
-        type: 'retrieve:documents:request',
+        type: 'retrieve_documents',
         timestamp: now,
         request: payload,
       });
+      ragLog.startMeasure();
       req.ragLog = ragLog;
 
       const { costUSD, documents, documentIds } = await retrieveDocuments({
@@ -171,10 +172,10 @@ module.exports = (router) => {
         },
       };
 
-      ragLog.addChild(new TreeNode({
-        type: 'retrieve:documents:response',
+      ragLog.appendData({
         response: finalResponse,
-      }));
+      });
+      ragLog.endMeasure();
 
       req.transactionAction = 'retrieve_documents';
       req.transactionCostUSD = costUSD;

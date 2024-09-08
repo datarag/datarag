@@ -19,13 +19,13 @@ const { Op } = db.Sequelize;
  * @param {*} { organization, agentId, datasourceIds }
  * @return {*}
  */
-async function findDatasourceIds({ organization, agentId, datasourceIds }) {
+async function findDatasourceIds({ organization, agentResId, datasourceResIds }) {
   const data = [];
-  if (agentId) {
+  if (agentResId) {
     const agent = await db.Agent.findOne({
       where: {
         OrganizationId: organization.id,
-        resId: agentId,
+        resId: agentResId,
       },
     });
     if (!agent) {
@@ -36,11 +36,11 @@ async function findDatasourceIds({ organization, agentId, datasourceIds }) {
     });
     _.each(datasources, (model) => data.push(model.id));
   }
-  if (!_.isEmpty(datasourceIds)) {
+  if (!_.isEmpty(datasourceResIds)) {
     const datasources = await organization.getDatasources({
       where: {
         resId: {
-          [Op.in]: datasourceIds,
+          [Op.in]: datasourceResIds,
         },
       },
       attributes: ['id'],
@@ -90,12 +90,29 @@ async function retrieveChunks({
   let chunks = [];
   const chunksMap = {};
 
+  const retrieveRagLog = ragLog.addChild(new TreeNode({
+    type: 'retrieval',
+    query: prompt,
+    total_chunks: await db.Chunk.count({
+      where: {
+        OrganizationId: organization.id,
+        DatasourceId: {
+          [Op.in]: datasourceIds,
+        },
+      },
+    }),
+  }));
+  retrieveRagLog.startMeasure();
+
   const addUniqueChunks = (newChunks) => {
+    const addedChunks = [];
     _.each(newChunks, (chunk) => {
       if (chunksMap[chunk.id]) return;
       chunksMap[chunk.id] = true;
       chunks.push(chunk);
+      addedChunks.push(chunk);
     });
+    return addedChunks;
   };
 
   // create a vector on the query
@@ -109,10 +126,11 @@ async function retrieveChunks({
       logger.debug('retrieveChunks', `Full text search: ${query}`);
 
       // Add to Rag Log
-      const searchRagLog = ragLog.addChild(new TreeNode({
+      const searchRagLog = retrieveRagLog.addChild(new TreeNode({
         type: 'full_text_search',
         query,
       }));
+      searchRagLog.startMeasure();
 
       const response = await fullTextSearch({
         query,
@@ -121,28 +139,34 @@ async function retrieveChunks({
         datasourceIds,
       });
       costUSD += response.costUSD;
+
+      searchRagLog.endMeasure();
+
       logger.debug('retrieveChunks', `Full text search yield ${response.data.length} results`);
 
+      const addedChunks = addUniqueChunks(response.data);
+
       // Register Rag Log response
-      _.each(response.data, (chunk) => {
+      _.each(addedChunks, (chunk) => {
         searchRagLog.addChild(new TreeNode({
           type: 'chunk',
           similarity: chunk.similarity,
-          chunk_id: chunk.id,
+          chunk_ref: chunk.id,
+          datasource_ref: chunk.DatasourceId,
+          document_ref: chunk.DocumentId,
         }));
       });
-
-      addUniqueChunks(response.data);
     })(),
     // Semantic search
     (async () => {
       logger.debug('retrieveChunks', `Semantic search: ${query}`);
 
       // Add to Rag Log
-      const searchRagLog = ragLog.addChild(new TreeNode({
+      const searchRagLog = retrieveRagLog.addChild(new TreeNode({
         type: 'semantic_search',
         query,
       }));
+      searchRagLog.startMeasure();
 
       const response = await semanticSearch({
         query,
@@ -151,18 +175,23 @@ async function retrieveChunks({
         datasourceIds,
       });
       costUSD += response.costUSD;
+
+      searchRagLog.endMeasure();
+
       logger.debug('retrieveChunks', `Semantic search yield ${response.data.length} results`);
 
       // Add regular chunks
       const regularChunks = _.filter(response.data, (chunk) => chunk.type === 'chunk');
-      addUniqueChunks(regularChunks);
+      const addedChunks = addUniqueChunks(regularChunks);
 
       // Register Rag Log response
-      _.each(regularChunks, (chunk) => {
+      _.each(addedChunks, (chunk) => {
         searchRagLog.addChild(new TreeNode({
           type: 'chunk',
           similarity: chunk.similarity,
-          chunk_id: chunk.id,
+          chunk_ref: chunk.id,
+          datasource_ref: chunk.DatasourceId,
+          document_ref: chunk.DocumentId,
         }));
       });
 
@@ -201,21 +230,32 @@ async function retrieveChunks({
             },
           });
 
-          addUniqueChunks(relChunks);
+          const relAddedChunks = addUniqueChunks(relChunks);
 
           // Register Rag log
+          const relAddedChunksHashIds = {};
+          _.each(relAddedChunks, (chunk) => {
+            relAddedChunksHashIds[chunk.id] = true;
+          });
+
           const relationHashMap = {};
           _.each(relations, (relation) => {
+            if (!relAddedChunksHashIds[relation.TargetChunkId]) return;
             relationHashMap[relation.ChunkId] = relation.TargetChunkId;
           });
           _.each(questionChunks, (questionChunk) => {
+            if (!relationHashMap[questionChunk.id]) return;
             searchRagLog.addChild(new TreeNode({
               type: 'question',
               similarity: questionChunk.similarity,
-              chunk_id: questionChunk.id,
+              chunk_ref: questionChunk.id,
+              datasource_ref: questionChunk.DatasourceId,
+              document_ref: questionChunk.DocumentId,
             })).addChild(new TreeNode({
               type: 'chunk',
-              chunk_id: relationHashMap[questionChunk.id],
+              chunk_ref: relationHashMap[questionChunk.id],
+              datasource_ref: questionChunk.DatasourceId,
+              document_ref: questionChunk.DocumentId,
             }));
           });
         })(),
@@ -241,25 +281,39 @@ async function retrieveChunks({
             },
           });
 
-          addUniqueChunks(relChunks);
+          const relAddedChunks = addUniqueChunks(relChunks);
 
           // Register Rag log
+          const relAddedChunksHashIds = {};
+          _.each(relAddedChunks, (chunk) => {
+            relAddedChunksHashIds[chunk.id] = true;
+          });
+
           _.each(summaryChunks, (summaryChunk) => {
-            const summaryRagLog = searchRagLog.addChild(new TreeNode({
-              type: 'summary',
-              similarity: summaryChunk.similarity,
-              chunk_id: summaryChunk.id,
-            }));
             const sumChunks = _.filter(
               relChunks,
-              (chunk) => chunk.DocumentId === summaryChunk.DocumentId,
+              (chunk) => (
+                chunk.DocumentId === summaryChunk.DocumentId
+                && relAddedChunksHashIds[chunk.id]
+              ),
             );
-            _.each(sumChunks, (chunk) => {
-              summaryRagLog.addChild(new TreeNode({
-                type: 'chunk',
-                chunk_id: chunk.id,
+            if (!_.isEmpty(sumChunks)) {
+              const summaryRagLog = searchRagLog.addChild(new TreeNode({
+                type: 'summary',
+                similarity: summaryChunk.similarity,
+                chunk_ref: summaryChunk.id,
+                datasource_ref: summaryChunk.DatasourceId,
+                document_ref: summaryChunk.DocumentId,
               }));
-            });
+              _.each(sumChunks, (chunk) => {
+                summaryRagLog.addChild(new TreeNode({
+                  type: 'chunk',
+                  chunk_ref: chunk.id,
+                  datasource_ref: chunk.DatasourceId,
+                  document_ref: chunk.DocumentId,
+                }));
+              });
+            }
           });
         })(),
       ]);
@@ -272,6 +326,15 @@ async function retrieveChunks({
 
   // Rerank
   logger.debug('retrieveChunks', `Reranking ${chunks.length} chunks`);
+
+  const rerankRagLog = retrieveRagLog.addChild(new TreeNode({
+    type: 'rerank',
+    query,
+    threshold: RERANK_THRESHOLD,
+    input_chunk_count: chunks.length,
+  }));
+  rerankRagLog.startMeasure();
+
   const rerankResponse = await rerank({
     query,
     chunks,
@@ -279,6 +342,9 @@ async function retrieveChunks({
   });
   costUSD += rerankResponse.costUSD;
   chunks = rerankResponse.chunks;
+
+  rerankRagLog.endMeasure();
+
   logger.debug('retrieveChunks', `Chunks reranked to ${chunks.length} chunks`);
 
   // Reduce chunks based on limits
@@ -299,16 +365,12 @@ async function retrieveChunks({
     }
   }
 
-  const rerankRagLog = ragLog.addChild(new TreeNode({
-    type: 'rerank',
-    query,
-    threshold: RERANK_THRESHOLD,
-    input_chunk_count: chunks.length,
-  }));
   _.each(chunks, (chunk) => {
     rerankRagLog.addChild(new TreeNode({
       type: 'chunk',
-      chunk_id: chunk.id,
+      chunk_ref: chunk.id,
+      datasource_ref: chunk.DatasourceId,
+      document_ref: chunk.DocumentId,
       similarity: chunk.similarity,
       relevance_score: chunk.score,
     }));
@@ -375,6 +437,8 @@ async function retrieveChunks({
     });
   });
 
+  retrieveRagLog.endMeasure();
+
   return {
     chunks: response,
     costUSD,
@@ -394,6 +458,20 @@ async function retrieveDocuments({
   organization, datasourceIds, prompt,
   maxDocuments, ragLog,
 }) {
+  const retrieveRagLog = ragLog.addChild(new TreeNode({
+    type: 'retrieval',
+    query: prompt,
+    total_chunks: await db.Chunk.count({
+      where: {
+        OrganizationId: organization.id,
+        DatasourceId: {
+          [Op.in]: datasourceIds,
+        },
+      },
+    }),
+  }));
+  retrieveRagLog.startMeasure();
+
   let costUSD = 0;
 
   const { query, queryVector, costUSD: qCostUSD } = await prepareQuery(prompt);
@@ -404,10 +482,11 @@ async function retrieveDocuments({
   // Full text search (first pass)
   await (async () => {
     // Add to Rag log
-    const searchRagLog = ragLog.addChild(new TreeNode({
+    const searchRagLog = retrieveRagLog.addChild(new TreeNode({
       type: 'full_text_search',
       query,
     }));
+    searchRagLog.startMeasure();
 
     const response = await fullTextSearch({
       query,
@@ -417,12 +496,17 @@ async function retrieveDocuments({
       limit: Math.max(100, maxDocuments || 0),
     });
     costUSD += response.costUSD;
+
+    searchRagLog.endMeasure();
+
     _.each(response.data, (chunk) => {
       // Register Rag log response
       searchRagLog.addChild(new TreeNode({
         type: 'chunk',
         similarity: chunk.similarity,
-        chunk_id: chunk.id,
+        chunk_ref: chunk.id,
+        datasource_ref: chunk.DatasourceId,
+        document_ref: chunk.DocumentId,
       }));
 
       if (documentIds.indexOf(chunk.DocumentId) < 0) {
@@ -435,10 +519,11 @@ async function retrieveDocuments({
   if (maxDocuments > 0 && documentIds.length < maxDocuments) {
     await (async () => {
       // Add to Rag log
-      const searchRagLog = ragLog.addChild(new TreeNode({
+      const searchRagLog = retrieveRagLog.addChild(new TreeNode({
         type: 'semantic_search',
         query,
       }));
+      searchRagLog.startMeasure();
 
       const response = await semanticSearch({
         query,
@@ -448,11 +533,16 @@ async function retrieveDocuments({
         limit: maxDocuments,
       });
       costUSD += response.costUSD;
+
+      searchRagLog.endMeasure();
+
       _.each(response.data, (chunk) => {
         searchRagLog.addChild(new TreeNode({
           type: 'chunk',
           similarity: chunk.similarity,
-          chunk_id: chunk.id,
+          chunk_ref: chunk.id,
+          datasource_ref: chunk.DatasourceId,
+          document_ref: chunk.DocumentId,
         }));
 
         if (documentIds.indexOf(chunk.DocumentId) < 0) {
@@ -476,6 +566,8 @@ async function retrieveDocuments({
       },
     },
   });
+
+  retrieveRagLog.endMeasure();
 
   return {
     documentIds,
