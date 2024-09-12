@@ -4,6 +4,7 @@ const { serializeConnector } = require('../helpers/serialize');
 const { generateRandomHash } = require('../helpers/tokens');
 const db = require('../db/models');
 const { convertToFunctionName, isSafeUrl } = require('../helpers/utils');
+const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
 
 const { Op } = db.Sequelize;
 
@@ -124,7 +125,9 @@ module.exports = (router) => {
    *       - Datasources ➝ Connectors
    *     summary: List connectors
    *     description: |
-   *        Return a list of all the datasource connectors accessible by the API token.
+   *       Return a list of all the datasource connectors accessible by the API token.
+   *
+   *       **API Scope: `data:read`**
    *     parameters:
    *       - name: datasource_id
    *         in: path
@@ -173,7 +176,7 @@ module.exports = (router) => {
    */
   router.get(
     '/datasources/:datasource_id/connectors',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_READ, async (req, res) => {
       const datasource = await db.Datasource.findOne({
         where: {
           OrganizationId: req.organization.id,
@@ -229,12 +232,14 @@ module.exports = (router) => {
    *       You may define the id or leave empty and a random unique id will
    *       be associated with the connector. If a connector with the same
    *       id already exists, it is updated
-  *     parameters:
-  *       - name: datasource_id
-  *         in: path
-  *         required: true
-  *         schema:
-  *           type: string
+   *
+   *       **API Scope: `data:write`**
+   *     parameters:
+   *       - name: datasource_id
+   *         in: path
+   *         required: true
+   *         schema:
+   *           type: string
    *     requestBody:
    *       description: Connector to be created.
    *       required: true
@@ -278,7 +283,7 @@ module.exports = (router) => {
    */
   router.post(
     '/datasources/:datasource_id/connectors',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_WRITE, async (req, res) => {
       const datasource = await db.Datasource.findOne({
         where: {
           OrganizationId: req.organization.id,
@@ -340,7 +345,10 @@ module.exports = (router) => {
   *     tags:
   *       - Datasources ➝ Connectors
   *     summary: Get connector
-  *     description: Retrieve a specific datasource connector by its id.
+  *     description: |
+  *       Retrieve a specific datasource connector by its id.
+  *
+  *       **API Scope: `data:read`**
   *     parameters:
   *       - name: datasource_id
   *         in: path
@@ -377,7 +385,7 @@ module.exports = (router) => {
   */
   router.get(
     '/datasources/:datasource_id/connectors/:connector_id',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_READ, async (req, res) => {
       const datasource = await db.Datasource.findOne({
         where: {
           OrganizationId: req.organization.id,
@@ -413,7 +421,10 @@ module.exports = (router) => {
   *     tags:
   *       - Datasources ➝ Connectors
   *     summary: Delete connector
-  *     description: Delete a specific datasource connector by its id.
+  *     description: |
+  *       Delete a specific datasource connector by its id.
+  *
+  *       **API Scope: `data:write`**
   *     parameters:
   *       - name: datasource_id
   *         in: path
@@ -443,7 +454,7 @@ module.exports = (router) => {
   */
   router.delete(
     '/datasources/:datasource_id/connectors/:connector_id',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_WRITE, async (req, res) => {
       const datasource = await db.Datasource.findOne({
         where: {
           OrganizationId: req.organization.id,

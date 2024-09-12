@@ -2,6 +2,7 @@ const _ = require('lodash');
 const { apiRoute, badRequestResponse } = require('../helpers/responses');
 const { findDatasourceIds, retrieveDocuments, createSnippets } = require('./retrieveCommon');
 const { TreeNode } = require('../helpers/treenode');
+const { SCOPE_RETRIEVAL } = require('../scopes');
 
 module.exports = (router) => {
   /**
@@ -55,6 +56,8 @@ module.exports = (router) => {
   *       Perform a query on a set of datasources or agent.
   *       Return relevant documents for search functionality.
   *       You may query a agent, a set of datasources, or both.
+  *
+  *       **API Scope: `retrieval`**
   *     requestBody:
   *       description: Query properties.
   *       required: true
@@ -120,7 +123,7 @@ module.exports = (router) => {
   */
   router.post(
     '/retrieve/documents',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_RETRIEVAL, async (req, res) => {
       const now = Date.now();
       const payload = req.body.data;
 

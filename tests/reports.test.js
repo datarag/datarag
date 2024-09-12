@@ -5,6 +5,7 @@ const { app } = require('../src/server');
 const { setupOrg, tearDownOrg } = require('./factory');
 const db = require('../src/db/models');
 const { serializeDocument, serializeDatasource } = require('../src/helpers/serialize');
+const { SCOPE_REPORTS, SCOPE_CHAT } = require('../src/scopes');
 
 const TOKEN = 'org1';
 
@@ -15,6 +16,7 @@ describe('Transactions API', () => {
 
   beforeEach(async () => {
     factory = await setupOrg(TOKEN);
+    await factory.apiKey.update({ scopes: `${SCOPE_REPORTS}` });
 
     // Create a corresponding chunk in the database
     chunk = await db.Chunk.create({
@@ -103,6 +105,25 @@ describe('Transactions API', () => {
         .set('Authorization', 'Bearer invalid');
 
       expect(res.statusCode).toEqual(401);
+      expect(res.body).toMatchObject({
+        errors: ['Authentication credentials are missing'],
+        message: 'Unauthorized',
+      });
+    });
+
+    it('should return 401 if scope is invalid', async () => {
+      await factory.apiKey.update({ scopes: `${SCOPE_CHAT}` });
+
+      const agent = supertest.agent(app);
+      const res = await agent
+        .get(`/v1/transactions/${transactionId}`)
+        .set('Authorization', `Bearer ${TOKEN}`);
+
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toMatchObject({
+        errors: ['Invalid API scopes'],
+        message: 'Unauthorized',
+      });
     });
   });
 });

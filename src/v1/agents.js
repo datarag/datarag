@@ -3,6 +3,7 @@ const { apiRoute, conflictResponse, notFoundResponse } = require('../helpers/res
 const { serializeAgent, serializeDatasource } = require('../helpers/serialize');
 const { generateRandomHash } = require('../helpers/tokens');
 const db = require('../db/models');
+const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
 
 const { Op } = db.Sequelize;
 
@@ -64,8 +65,10 @@ module.exports = (router) => {
    *       - Agents
    *     summary: List agents
    *     description: |
-   *        Return a list of all the agents accessible by the API token.
-   *        A agent is a set of datasources grouped together.
+   *       Return a list of all the agents accessible by the API token.
+   *       An agent is a set of datasources grouped together.
+   *
+   *       **API Scope: `data:read`**
    *     parameters:
    *       - in: query
    *         name: cursor
@@ -103,7 +106,7 @@ module.exports = (router) => {
    */
   router.get(
     '/agents',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_READ, async (req, res) => {
       const { cursor, limit = 100 } = req.query;
       const limitNum = parseInt(limit, 10);
 
@@ -147,6 +150,8 @@ module.exports = (router) => {
    *       A agent is referenced by a unique id.
    *       You may define the id or leave empty and a random unique id will
    *       be associated with the agent.
+   *
+   *       **API Scope: `data:write`**
    *     requestBody:
    *       description: Agent to be created.
    *       required: true
@@ -190,7 +195,7 @@ module.exports = (router) => {
    */
   router.post(
     '/agents',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_WRITE, async (req, res) => {
       const payload = req.body.data;
       const resId = payload.id;
       if (resId) {
@@ -237,7 +242,10 @@ module.exports = (router) => {
   *     tags:
   *       - Agents
   *     summary: Get agent
-  *     description: Retrieve a specific agent by its id.
+  *     description: |
+  *       Retrieve a specific agent by its id.
+  *
+  *       **API Scope: `data:read`**
   *     parameters:
   *       - name: agent_id
   *         in: path
@@ -269,7 +277,7 @@ module.exports = (router) => {
   */
   router.get(
     '/agents/:agent_id',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_READ, async (req, res) => {
       const agent = await db.Agent.findOne({
         where: {
           OrganizationId: req.organization.id,
@@ -293,7 +301,10 @@ module.exports = (router) => {
   *     tags:
   *       - Agents
   *     summary: Update agent
-  *     description: Update a specific agent by its id.
+  *     description: |
+  *       Update a specific agent by its id.
+  *
+  *       **API Scope: `data:write`**
   *     parameters:
   *       - name: agent_id
   *         in: path
@@ -349,7 +360,7 @@ module.exports = (router) => {
   */
   router.put(
     '/agents/:agent_id',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_WRITE, async (req, res) => {
       const payload = req.body.data;
       const agent = await db.Agent.findOne({
         where: {
@@ -399,7 +410,10 @@ module.exports = (router) => {
   *     tags:
   *       - Agents
   *     summary: Delete agent
-  *     description: Delete a specific agent by its id.
+  *     description: |
+  *       Delete a specific agent by its id.
+  *
+  *       **API Scope: `data:write`**
   *     parameters:
   *       - name: agent_id
   *         in: path
@@ -424,7 +438,7 @@ module.exports = (router) => {
   */
   router.delete(
     '/agents/:agent_id',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_WRITE, async (req, res) => {
       const agent = await db.Agent.findOne({
         where: {
           OrganizationId: req.organization.id,
@@ -447,7 +461,10 @@ module.exports = (router) => {
   *     tags:
   *       - Agents ➝ Datasources
   *     summary: List datasources in agent
-  *     description: Get datasources associated with that agent.
+  *     description: |
+  *       Get datasources associated with that agent.
+  *
+  *       **API Scope: `data:read`**
   *     parameters:
   *       - name: agent_id
   *         in: path
@@ -496,7 +513,7 @@ module.exports = (router) => {
   */
   router.get(
     '/agents/:agent_id/datasources',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_READ, async (req, res) => {
       const agent = await db.Agent.findOne({
         where: {
           OrganizationId: req.organization.id,
@@ -546,7 +563,10 @@ module.exports = (router) => {
   *     tags:
   *       - Agents ➝ Datasources
   *     summary: Add datasource to agent
-  *     description: Add datasource to agent.
+  *     description: |
+  *       Add datasource to agent.
+  *
+  *       **API Scope: `data:write`**
   *     parameters:
   *       - name: agent_id
   *         in: path
@@ -594,7 +614,7 @@ module.exports = (router) => {
   */
   router.post(
     '/agents/:agent_id/datasources',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_WRITE, async (req, res) => {
       const payload = req.body.data;
 
       const agent = await db.Agent.findOne({
@@ -641,7 +661,10 @@ module.exports = (router) => {
   *     tags:
   *       - Agents ➝ Datasources
   *     summary: Remove datasource from agent
-  *     description: Remove datasource from agent.
+  *     description: |
+  *       Remove datasource from agent.
+  *
+  *       **API Scope: `data:write`**
   *     parameters:
   *       - name: agent_id
   *         in: path
@@ -689,7 +712,7 @@ module.exports = (router) => {
   */
   router.delete(
     '/agents/:agent_id/datasources',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_WRITE, async (req, res) => {
       const payload = req.body.data;
 
       const agent = await db.Agent.findOne({

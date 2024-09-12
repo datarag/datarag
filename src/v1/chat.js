@@ -10,6 +10,7 @@ const { findDatasourceIds, retrieveChunks } = require('./retrieveCommon');
 const { convertToFunctionName, nameFunction } = require('../helpers/utils');
 const { chatStream } = require('../llms/openai');
 const { TreeNode } = require('../helpers/treenode');
+const { SCOPE_CHAT } = require('../scopes');
 
 module.exports = (router) => {
   /**
@@ -111,6 +112,8 @@ module.exports = (router) => {
   *       Run prompt over an LLM for Retrieval Augmented Generation,
   *       over a set of datasources for grounded knowledge.
   *       You may augment a agent, a set of datasources, or both.
+  *
+  *       **API Scope: `chat`**
   *     requestBody:
   *       description: Generation properties.
   *       required: true
@@ -163,7 +166,7 @@ module.exports = (router) => {
   */
   router.post(
     '/chat',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_CHAT, async (req, res) => {
       const provider = 'openai';
       const now = Date.now();
       const uuid = nanoid();

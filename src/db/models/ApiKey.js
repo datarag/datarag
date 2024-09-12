@@ -14,6 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     OrganizationId: DataTypes.BIGINT,
     tokenHash: DataTypes.STRING,
     name: DataTypes.STRING,
+    scopes: DataTypes.STRING,
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
   }, {

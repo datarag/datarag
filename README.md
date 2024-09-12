@@ -94,6 +94,44 @@ make dbshell
 
 See `Makefile` for more options.
 
+## Generate API credentials
+
+All API requests need authentication using API tokens. 
+
+Whether you are on local or production environments you can setup credentials by getting access to a
+running container and invoke the following commands.
+
+Create a new organization, that will act as a primary host for both API keys and data:
+
+```
+$ node cli/create_organization name="my-organization-slug"
+```
+
+And then create API keys using the following command:
+
+```
+$ node cli/create_apikey org="my-organization-slug" apikey="a-super-secret-api-token" name="my-api-token"
+```
+
+This will create an API key with all available scopes. To restrict the scope, you can use the following command:
+
+```
+$ node cli/create_apikey org="my-organization-slug" apikey="a-super-secret-api-token" scopes="data:read,chat" name="my-api-token"
+```
+
+Available scopes:
+- `data:read`
+- `data:write`
+- `retrieval`
+- `chat`
+- `reports`
+
+## Use the API
+
+After credentials have been created, you can use the Datarag API to index, retrieve, and chat with your data.
+
+A full documentation of the API is available [here](https://api.datarag.ai/docs).
+
 ## Production deployment
 
 You will need:

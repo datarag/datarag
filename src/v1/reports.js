@@ -3,6 +3,7 @@ const _ = require('lodash');
 const { apiRoute, notFoundResponse } = require('../helpers/responses');
 const db = require('../db/models');
 const { serializeDocument, serializeDatasource } = require('../helpers/serialize');
+const { SCOPE_REPORTS } = require('../scopes');
 
 const { Op } = db.Sequelize;
 
@@ -78,25 +79,27 @@ module.exports = (router) => {
    *       - Reports & Logs
    *     summary: Get transaction
    *     description: |
-   *        Return the details of a retrieval or chat transaction based on `transaction_id` returned
-   *        on the meta response of the relevant API endpoints.
+   *       Return the details of a retrieval or chat transaction based on `transaction_id` returned
+   *       on the meta response of the relevant API endpoints.
    *
-   *        The use case is for debugging RAG operations.
+   *       The use case is for debugging RAG operations.
    *
-   *        The details contain the reasoning logic of the RAG operation, including:
-   *        - Request data
-   *        - Retrieval logic
-   *        - Response data
+   *       The details contain the reasoning logic of the RAG operation, including:
+   *       - Request data
+   *       - Retrieval logic
+   *       - Response data
    *
-   *        **Can only be queried by the same API token used to generate the transaction, for
-   *        privacy reasons.**
+   *       **Can only be queried by the same API token used to generate the transaction, for
+   *       privacy reasons.**
    *
-   *        RAG logs should be enabled and be available
-   *        within the retention period of the logs, otherwise 404 will be returned.
+   *       RAG logs should be enabled and be available
+   *       within the retention period of the logs, otherwise 404 will be returned.
    *
-   *        Also, please note that transaction history is stored in an async way. That means
-   *        that the transaction log might be available a few seconds after the transaction has
-   *        completed.
+   *       Also, please note that transaction history is stored in an async way. That means
+   *       that the transaction log might be available a few seconds after the transaction has
+   *       completed.
+   *
+   *       **API Scope: `reports`**
    *     parameters:
    *       - name: transaction_id
    *         in: path
@@ -128,7 +131,7 @@ module.exports = (router) => {
    */
   router.get(
     '/transactions/:transaction_id',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_REPORTS, async (req, res) => {
       const ragLog = await db.RagLog.findOne({
         where: {
           OrganizationId: req.organization.id,
