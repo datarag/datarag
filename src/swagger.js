@@ -26,6 +26,18 @@ For example, the HTTP request header should look like this:
 Authorization: Bearer YOUR-DATARAG-API-TOKEN
 \`\`\`
 
+
+API token permissions are further tuned using API scopes. So ensure that the generated API token is properly
+scoped for accessing the relevant endpoints.
+
+Available scopes are:
+- \`data:read\`: Can use read endpoints in relation to data indexing setup (e.g. Datasources, Agents).
+- \`data:write\`: Can use update endpoints in relation to data indexing setup.
+- \`retrieval\`: Can use data retrieval endpoints to query data based on user queries.
+- \`chat\`: Can use chat endpoints to talk with your data.
+- \`reports\`: Can use report endpoints.
+- \`*\`: Allow all current and future operations (super-admin access).
+
 # Pagination
 
 Endpoints that support pagination (e.g. listing resources) as limited by default to 100

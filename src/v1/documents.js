@@ -7,6 +7,7 @@ const db = require('../db/models');
 const { addJob } = require('../queue');
 const logger = require('../logger');
 const { fetchAndCleanHtml } = require('../helpers/utils');
+const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
 
 const { Op } = db.Sequelize;
 
@@ -97,7 +98,9 @@ module.exports = (router) => {
    *       - Datasources ➝ Documents
    *     summary: List documents
    *     description: |
-   *        Return a list of all the datasource documents accessible by the API token.
+   *       Return a list of all the datasource documents accessible by the API token.
+   *
+   *       **API Scope: `data:read`**
    *     parameters:
    *       - name: datasource_id
    *         in: path
@@ -146,7 +149,7 @@ module.exports = (router) => {
    */
   router.get(
     '/datasources/:datasource_id/documents',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_READ, async (req, res) => {
       const datasource = await db.Datasource.findOne({
         where: {
           OrganizationId: req.organization.id,
@@ -202,12 +205,14 @@ module.exports = (router) => {
    *       You may define the id or leave empty and a random unique id will
    *       be associated with the document. If a document with the same
    *       id already exists, it is updated
-  *     parameters:
-  *       - name: datasource_id
-  *         in: path
-  *         required: true
-  *         schema:
-  *           type: string
+   *
+   *       **API Scope: `data:write`**
+   *     parameters:
+   *       - name: datasource_id
+   *         in: path
+   *         required: true
+   *         schema:
+   *           type: string
    *     requestBody:
    *       description: Document to be created.
    *       required: true
@@ -251,7 +256,7 @@ module.exports = (router) => {
    */
   router.post(
     '/datasources/:datasource_id/documents',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_WRITE, async (req, res) => {
       const datasource = await db.Datasource.findOne({
         where: {
           OrganizationId: req.organization.id,
@@ -343,7 +348,10 @@ module.exports = (router) => {
   *     tags:
   *       - Datasources ➝ Documents
   *     summary: Get document
-  *     description: Retrieve a specific datasource document by its id.
+  *     description: |
+  *       Retrieve a specific datasource document by its id.
+  *
+  *       **API Scope: `data:read`**
   *     parameters:
   *       - name: datasource_id
   *         in: path
@@ -380,7 +388,7 @@ module.exports = (router) => {
   */
   router.get(
     '/datasources/:datasource_id/documents/:document_id',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_READ, async (req, res) => {
       const datasource = await db.Datasource.findOne({
         where: {
           OrganizationId: req.organization.id,
@@ -416,7 +424,10 @@ module.exports = (router) => {
   *     tags:
   *       - Datasources ➝ Documents
   *     summary: Delete document
-  *     description: Delete a specific datasource document by its id.
+  *     description: |
+  *       Delete a specific datasource document by its id.
+  *
+  *       **API Scope: `data:write`**
   *     parameters:
   *       - name: datasource_id
   *         in: path
@@ -446,7 +457,7 @@ module.exports = (router) => {
   */
   router.delete(
     '/datasources/:datasource_id/documents/:document_id',
-    apiRoute(async (req, res) => {
+    apiRoute(SCOPE_DATA_WRITE, async (req, res) => {
       const datasource = await db.Datasource.findOne({
         where: {
           OrganizationId: req.organization.id,

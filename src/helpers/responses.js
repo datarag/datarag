@@ -1,3 +1,4 @@
+const _ = require('lodash');
 const logger = require('../logger');
 const { logTransaction } = require('../transactionlog');
 
@@ -33,10 +34,10 @@ function badRequestResponse(req, res, error) {
  * @param {*} req
  * @param {*} res
  */
-function unauthorizedResponse(req, res) {
+function unauthorizedResponse(req, res, error) {
   res.status(401).json({
     message: 'Unauthorized',
-    errors: ['Authentication credentials are missing'],
+    errors: [error || 'Authentication credentials are missing'],
   });
 }
 
@@ -59,8 +60,13 @@ function conflictResponse(req, res) {
  * @param {*} fn
  * @return {*}
  */
-function apiRoute(fn) {
+function apiRoute(scope, fn) {
   return (req, res, next) => {
+    const apiScopes = _.compact((req.apiKey.scopes || '').replace(/ /g, ',').split(','));
+    if (apiScopes.indexOf(scope) < 0 && apiScopes.indexOf('*') < 0) {
+      unauthorizedResponse(req, res, 'Invalid API scopes');
+      return;
+    }
     Promise.resolve(fn(req, res, next))
       .then(() => {
         logTransaction(req, res);

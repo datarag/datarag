@@ -2,6 +2,7 @@ const db = require('../src/db/models');
 const { hashToken } = require('../src/helpers/tokens');
 const { countJobs } = require('../src/queue');
 const { initializeQueue } = require('../src/queue/init');
+const { SCOPE_ALL } = require('../src/scopes');
 
 async function waitWorker() {
   let isProcessing = false;
@@ -35,6 +36,7 @@ async function setupOrg(name) {
     OrganizationId: organization.id,
     tokenHash: hashToken(name),
     name,
+    scopes: SCOPE_ALL,
   });
 
   const datasource = await db.Datasource.create({

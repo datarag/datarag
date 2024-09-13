@@ -1,6 +1,7 @@
 const supertest = require('supertest');
 const { app } = require('../src/server');
 const { setupOrg, tearDownOrg } = require('./factory');
+const { SCOPE_RETRIEVAL, SCOPE_CHAT } = require('../src/scopes');
 
 const TOKEN = 'org1';
 const OTHER_TOKEN = 'other';
@@ -10,6 +11,8 @@ describe('Retrieve Chunks API', () => {
 
   beforeEach(async () => {
     factory = await setupOrg(TOKEN);
+    await factory.apiKey.update({ scopes: `${SCOPE_RETRIEVAL}` });
+
     await setupOrg(OTHER_TOKEN);
   });
 
@@ -76,6 +79,27 @@ describe('Retrieve Chunks API', () => {
       });
     });
 
+    it('should handle invalid scope', async () => {
+      await factory.apiKey.update({ scopes: `${SCOPE_CHAT}` });
+
+      const agent = supertest.agent(app);
+      const res = await agent
+        .post('/v1/retrieve/chunks')
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            query: 'What is machine learning?',
+            datasource_ids: [factory.datasource.resId],
+          },
+        });
+
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toMatchObject({
+        errors: ['Invalid API scopes'],
+        message: 'Unauthorized',
+      });
+    });
+
     it('should handle empty results if no relevant chunks found', async () => {
       const agent = supertest.agent(app);
       const res = await agent
@@ -123,6 +147,8 @@ describe('Retrieve Documents API', () => {
 
   beforeEach(async () => {
     factory = await setupOrg(TOKEN);
+    await factory.apiKey.update({ scopes: `${SCOPE_RETRIEVAL}` });
+
     await setupOrg(OTHER_TOKEN);
   });
 
@@ -207,6 +233,27 @@ describe('Retrieve Documents API', () => {
       expect(res.statusCode).toEqual(401);
       expect(res.body).toMatchObject({
         errors: ['Authentication credentials are missing'],
+        message: 'Unauthorized',
+      });
+    });
+
+    it('should handle invalid scope', async () => {
+      await factory.apiKey.update({ scopes: `${SCOPE_CHAT}` });
+
+      const agent = supertest.agent(app);
+      const res = await agent
+        .post('/v1/retrieve/documents')
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            query: 'What is machine learning?',
+            datasource_ids: [factory.datasource.resId],
+          },
+        });
+
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toMatchObject({
+        errors: ['Invalid API scopes'],
         message: 'Unauthorized',
       });
     });

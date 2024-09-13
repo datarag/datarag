@@ -2,6 +2,7 @@ const supertest = require('supertest');
 const { app } = require('../src/server');
 const { setupOrg, tearDownOrg } = require('./factory');
 const db = require('../src/db/models'); // Ensure you import your database models
+const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../src/scopes');
 
 const TOKEN = 'org1';
 const OTHER_TOKEN = 'other';
@@ -11,6 +12,8 @@ describe('Agent API', () => {
 
   beforeEach(async () => {
     factory = await setupOrg(TOKEN);
+    await factory.apiKey.update({ scopes: `${SCOPE_DATA_READ},${SCOPE_DATA_WRITE}` });
+
     await setupOrg(OTHER_TOKEN);
   });
 
@@ -45,6 +48,20 @@ describe('Agent API', () => {
       expect(res.statusCode).toEqual(401);
       expect(res.body).toEqual({
         errors: ['Authentication credentials are missing'],
+        message: 'Unauthorized',
+      });
+    });
+
+    it('should handle api scope error', async () => {
+      await factory.apiKey.update({ scopes: 'data:write' });
+      const agent = supertest.agent(app);
+      const res = await agent
+        .get('/v1/agents')
+        .set('Authorization', `Bearer ${TOKEN}`);
+
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toEqual({
+        errors: ['Invalid API scopes'],
         message: 'Unauthorized',
       });
     });

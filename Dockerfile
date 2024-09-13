@@ -1,4 +1,4 @@
-FROM node:20.16.0-alpine as datarag-builder
+FROM node:20.16.0-alpine AS datarag-builder
 
 ARG USER_ID
 ARG GROUP_ID
@@ -22,7 +22,7 @@ EXPOSE 4100
 
 # ----------- Production image -----------
 
-FROM datarag-builder as datarag
+FROM datarag-builder AS datarag
 
 ENV NODE_ENV=production
 
@@ -37,7 +37,7 @@ CMD ["npm", "start"]
 
 # ----------- Development image -----------
 
-FROM datarag-builder as datarag-devel
+FROM datarag-builder AS datarag-devel
 
 # Install PostgreSQL client tools
 USER root
