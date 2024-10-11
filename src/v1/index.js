@@ -106,6 +106,7 @@ require('./connectors')(router);
 require('./retrieveChunks')(router);
 require('./retrieveDocuments')(router);
 require('./chat')(router);
+require('./inference')(router);
 require('./reports')(router);
 
 module.exports = router;
