@@ -147,6 +147,10 @@ module.exports = (router) => {
   *                        type: string
   *                        description: The initial requested query.
   *                        example: 'What is machine learning?'
+  *                     model:
+  *                        type: string
+  *                        description: The LLM model used for inference.
+  *                        example: 'gpt-4o'
   *                     transaction_id:
   *                        type: string
   *                        description: A transaction identifier.
@@ -501,7 +505,7 @@ User input question:
 ${payload.query}`;
       }
 
-      const { text, costUSD, chatHistory } = await chatStream({
+      const chatResponse = await chatStream({
         chatHistory: prevMessages,
         query,
         tools,
@@ -509,19 +513,19 @@ ${payload.query}`;
       });
 
       // Fix chatHistory issues from OpenAI SDK
-      _.each(chatHistory, (entry) => {
+      _.each(chatResponse.chatHistory, (entry) => {
         if (entry.content && entry.tool_calls) {
           entry.tool_calls = null;
         }
       });
 
-      queryCostUSD += costUSD;
+      queryCostUSD += chatResponse.costUSD;
 
       if (conversation) {
         await conversation.update({
           history: {
             provider,
-            messages: chatHistory,
+            messages: chatResponse.chatHistory,
           },
         });
       } else {
@@ -530,23 +534,24 @@ ${payload.query}`;
           resId: nanoid(),
           history: {
             provider,
-            messages: chatHistory,
+            messages: chatResponse.chatHistory,
           },
         });
       }
 
-      if (!text) {
+      if (!chatResponse.text) {
         streamFn(cannedResponse);
       }
 
       const finalResponse = {
         data: {
-          message: text || cannedResponse,
+          message: chatResponse.text || cannedResponse,
           conversation_id: conversation.resId,
           finished: true,
         },
         meta: {
-          prompt: payload.prompt,
+          model: chatResponse.model,
+          query: payload.query,
           processing_time_ms: Date.now() - now,
           transaction_id: req.transactionId,
         },

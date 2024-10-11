@@ -55,6 +55,48 @@ nconf.set('costlog:enabled', getEnvironment('DATARAG_COSTLOG_ENABLED', true));
 nconf.set('raglog:enabled', getEnvironment('DATARAG_RAGLOG_ENABLED', true));
 nconf.set('raglog:retentiondays', getEnvironment('DATARAG_RAGLOG_RETENTIONDAYS', 3));
 
+// LLM costs
+nconf.set('llm:pricing', {
+  // OpenAI per token pricing
+  'gpt-4o-mini': {
+    input: 0.15 / 1000000,
+    output: 0.6 / 1000000,
+  },
+  'gpt-4o': {
+    input: 2.5 / 1000000,
+    output: 10 / 1000000,
+  },
+  'gpt-4-turbo': {
+    input: 10 / 1000000,
+    output: 30 / 1000000,
+  },
+  'gpt-3.5-turbo': {
+    input: 0.5 / 1000000,
+    output: 1.5 / 1000000,
+  },
+  'gpt-4': {
+    input: 30 / 1000000,
+    output: 60 / 1000000,
+  },
+  // Cohere per token pricing
+  'embed-multilingual-v3.0': {
+    input: 0.1 / 1000000,
+    output: 0,
+  },
+  'rerank-multilingual-v3.0': {
+    input: 2 / 1000, // per search price
+    output: 0,
+  },
+  'command-r-plus': {
+    input: 2.5 / 1000000,
+    output: 10 / 1000000,
+  },
+  'command-r': {
+    input: 0.15 / 1000000,
+    output: 0.6 / 1000000,
+  },
+});
+
 // Validate
 if (process.env.NODE_ENV === 'production') {
   if (!nconf.get('secrets:openai_api_key')) {

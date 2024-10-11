@@ -1,12 +1,22 @@
 /* eslint-disable no-param-reassign */
 const _ = require('lodash');
-const { CohereClient } = require('cohere-ai');
+const { CohereClient, CohereClientV2 } = require('cohere-ai');
 const config = require('../config');
 const logger = require('../logger');
 const { findMedian } = require('../helpers/utils');
+const {
+  LLM_CREATIVITY_HIGH,
+  LLM_CREATIVITY_MEDIUM,
+  LLM_CREATIVITY_LOW,
+  LLM_CREATIVITY_NONE,
+  LLM_QUALITY_HIGH,
+  LLM_QUALITY_MEDIUM,
+} = require('../constants');
 
 const COHERE_EMBEDDINGS_MODEL = 'embed-multilingual-v3.0';
 const COHERE_RERANK_MODEL = 'rerank-multilingual-v3.0';
+const COHERE_INFERENCE_MODEL_HIGH = 'command-r-plus';
+const COHERE_INFERENCE_MODEL_MED = 'command-r';
 
 const COHERE_CLIENT_CONFIG = {
   token: config.get('secrets:cohere_api_key'),
@@ -85,7 +95,7 @@ async function createEmbeddings({ texts, type }) {
   }
 
   const response = {
-    costUSD: (tokens * 0.1) / 1000000,
+    costUSD: tokens * config.get(`llm:pricing:${COHERE_EMBEDDINGS_MODEL}:input`),
     embeddings,
   };
 
@@ -135,7 +145,7 @@ async function rerank({ query, chunks, threshold }) {
       });
 
       const response = {
-        costUSD: 2 / 1000,
+        costUSD: config.get(`llm:pricing:${COHERE_RERANK_MODEL}:input`),
         chunks: _.isEmpty(filteredChunks) ? sortedChunks : filteredChunks,
       };
 
@@ -155,7 +165,101 @@ async function rerank({ query, chunks, threshold }) {
   throw new Error('Could not rerank');
 }
 
+/**
+ * Raw prompt over LLM
+ *
+ * @param {*} { text, instructions, creativity, quality }
+ * @return {*}
+ */
+async function inference({
+  text, instructions, creativity, quality,
+}) {
+  if (process.env.NODE_ENV === 'test') {
+    return {
+      model: 'gpt-test',
+      output: text,
+      costUSD: 0,
+    };
+  }
+
+  const cohere = new CohereClientV2(COHERE_CLIENT_CONFIG);
+
+  // Prepare messages
+  const messages = [];
+  if (instructions) {
+    messages.push({
+      role: 'system',
+      content: instructions,
+    });
+  }
+  messages.push({
+    role: 'user',
+    content: text,
+  });
+
+  // Prepare temperature
+  let temperature;
+  switch (creativity) {
+    case LLM_CREATIVITY_HIGH:
+      temperature = 1;
+      break;
+    case LLM_CREATIVITY_MEDIUM:
+      temperature = 0.5;
+      break;
+    case LLM_CREATIVITY_LOW:
+      temperature = 0.25;
+      break;
+    case LLM_CREATIVITY_NONE:
+    default:
+      temperature = 0;
+      break;
+  }
+
+  // Prepare models
+  let model;
+  switch (quality) {
+    case LLM_QUALITY_HIGH:
+      model = COHERE_INFERENCE_MODEL_HIGH;
+      break;
+    case LLM_QUALITY_MEDIUM:
+    default:
+      model = COHERE_INFERENCE_MODEL_MED;
+      break;
+  }
+
+  let attempt = 0;
+  while (attempt < MAX_RETRIES) {
+    try {
+      const chatResponse = await cohere.chat({
+        model,
+        messages,
+        temperature,
+      }, COHERE_CLIENT_REQUEST_OPTIONS);
+
+      return {
+        model,
+        output: chatResponse.message.content[0].text,
+        costUSD:
+          chatResponse.usage.billedUnits.inputTokens * config.get(`llm:pricing:${model}:input`)
+          + chatResponse.usage.billedUnits.outputTokens * config.get(`llm:pricing:${model}:output`),
+      };
+    } catch (err) {
+      attempt += 1;
+      if (attempt < MAX_RETRIES) {
+        const delay = attempt * 1000;
+        await new Promise((resolve) => { setTimeout(resolve, delay); });
+      } else {
+        logger.error('inference', err);
+        throw err;
+      }
+    }
+  }
+
+  throw new Error('Could not inference');
+}
+
 module.exports = {
+  inference,
   createEmbeddings,
   rerank,
 };

@@ -2,39 +2,33 @@ const _ = require('lodash');
 const { OpenAI } = require('openai');
 const config = require('../config');
 const logger = require('../logger');
+const {
+  LLM_CREATIVITY_HIGH,
+  LLM_CREATIVITY_MEDIUM,
+  LLM_CREATIVITY_LOW,
+  LLM_CREATIVITY_NONE,
+  LLM_QUALITY_HIGH,
+  LLM_QUALITY_MEDIUM,
+} = require('../constants');
 
 const OPENAI_API_KEY = config.get('secrets:openai_api_key');
-const MODELS = [
-  {
-    model: 'gpt-4o-mini',
-    cost_input_token: 0.15 / 1000000,
-    cost_output_token: 0.6 / 1000000,
-    max_retries: 10,
-  },
-  {
-    model: 'gpt-3.5-turbo',
-    cost_input_token: 0.5 / 1000000,
-    cost_output_token: 1.5 / 1000000,
-    max_retries: 10,
-  },
-  {
-    model: 'gpt-4o',
-    cost_input_token: 5 / 1000000,
-    cost_output_token: 15 / 1000000,
-    max_retries: 10,
-  },
-  {
-    model: 'gpt-4-turbo',
-    cost_input_token: 10 / 1000000,
-    cost_output_token: 30 / 1000000,
-    max_retries: 10,
-  },
-  {
-    model: 'gpt-4',
-    cost_input_token: 30 / 1000000,
-    cost_output_token: 60 / 1000000,
-    max_retries: 10,
-  },
+const MAX_RETRIES = 10;
+
+// Model order for summarizing and
+const PROCESSING_MODELS = [
+  'gpt-4o-mini',
+  'gpt-3.5-turbo',
+  'gpt-4o',
+  'gpt-4-turbo',
+  'gpt-4',
+];
+
+const REASONING_MODELS = [
+  'gpt-4o',
+  'gpt-4o-mini',
+  'gpt-4-turbo',
+  'gpt-3.5-turbo',
+  'gpt-4',
 ];
 
 let client;
@@ -51,25 +45,26 @@ if (OPENAI_API_KEY) {
  * @param {*} payload
  * @return {*}
  */
-async function completionBackoff(payload) {
-  for (let i = 0; i < MODELS.length; i += 1) {
-    const model = MODELS[i];
+async function completionBackoff(payload, models) {
+  for (let i = 0; i < models.length; i += 1) {
+    const model = models[i];
     try {
       const completion = await client.chat.completions.create({
         ...payload,
-        model: model.model,
+        model,
       }, {
-        maxRetries: model.max_retries,
+        maxRetries: MAX_RETRIES,
       });
       const { content } = completion.choices[0].message;
       if (!content) {
         throw new Error(completion);
       }
       return {
+        model,
         content,
         costUSD:
-          completion.usage.prompt_tokens * model.cost_input_token
-          + completion.usage.completion_tokens * model.cost_output_token,
+          completion.usage.prompt_tokens * config.get(`llm:pricing:${model}:input`)
+          + completion.usage.completion_tokens * config.get(`llm:pricing:${model}:output`),
       };
     } catch (err) {
       logger.error('openai', err);
@@ -79,125 +74,78 @@ async function completionBackoff(payload) {
 }
 
 /**
- * Summarize
+ * Raw prompt over LLM
  *
- * @param {*} { text, maxWords }
- * @return {String}
+ * @param {*} { text, instructions, creativity, quality }
+ * @return {*}
  */
-async function summarize({ text, maxWords }) {
+async function inference({
+  text, instructions, creativity, quality,
+}) {
   if (process.env.NODE_ENV === 'test') {
     return {
-      summary: text,
-      context: text,
+      model: 'gpt-test',
+      output: text,
       costUSD: 0,
     };
   }
 
   if (!client) throw new Error('No OpenAI key is defined');
 
-  const promptPayload = {
-    messages: [{
-      role: 'user',
-      content: `
-## Instructions
+  // Prepare messages
+  const messages = [];
+  if (instructions) {
+    messages.push({
+      role: 'system',
+      content: instructions,
+    });
+  }
+  messages.push({
+    role: 'user',
+    content: text,
+  });
 
-1. You are provided with a document that needs to be summarized.
-2. Your task is to create a concise summary of the document, capturing its key points and main ideas in up to ${maxWords} words.
-3. This summary will be used for embeddings and similarity search purposes.
-4. Ensure that the summary is clear, accurate, and retains the essence of the original document.
-5. After the summary is generated, also create a sort couple of sentences text that summarizes the summary, called context.
-
-Response in JSON format.
-
-Example response:
-{
-  "summary": "This is summary of the document",
-  "context": "This is a short summary of the summary"
-}
-
-## Document:
-${text}
-      `,
-    }],
-    temperature: 0.0,
-    response_format: { type: 'json_object' },
-  };
-
-  // No cache, recreate it
-  const completion = await completionBackoff(promptPayload);
-  const content = completion.content;
-
-  const json = JSON.parse(content);
-
-  const response = {
-    summary: json.summary,
-    context: json.context,
-    costUSD: completion.costUSD,
-  };
-
-  return response;
-}
-
-/**
- * Question bank
- *
- * @param {*} { text }
- * @return {String}
- */
-async function questionBank({ text }) {
-  if (process.env.NODE_ENV === 'test') {
-    return {
-      questions: [],
-      costUSD: 0,
-    };
+  // Prepare temperature
+  let temperature;
+  switch (creativity) {
+    case LLM_CREATIVITY_HIGH:
+      temperature = 1;
+      break;
+    case LLM_CREATIVITY_MEDIUM:
+      temperature = 0.5;
+      break;
+    case LLM_CREATIVITY_LOW:
+      temperature = 0.25;
+      break;
+    case LLM_CREATIVITY_NONE:
+    default:
+      temperature = 0;
+      break;
   }
 
-  if (!client) throw new Error('No OpenAI key is defined');
-
-  const promptPayload = {
-    messages: [{
-      role: 'user',
-      content: `
-You are an AI designed to create a knowledge base by generating questions based on the provided document.
-Given the document below, return questions that can be directly answered using the information from the document.
-Ensure the questions are clear, concise, and relevant to the key details in the document, and return them in a JSON array format.
-
-# Instructions:
-1. Read the provided document carefully.
-2. Identify key details, facts, and concepts.
-3. Formulate questions based on these key details. Each question should be answerable using the available information from the document only.
-4. Ensure the questions cover a range of information from the text, including but not limited to definitions, explanations, dates, names, events, processes, and relationships.
-5. Do not refer to the "document" or "text" in the generated questions. Do not use these words.
-6. Return questions in a JSON array format.
-
-Example JSON reponse:
-{
-  "questions": [
-    "Question 1",
-    "Question 2",
-    "Question 3"
-  ]
-}
-
-Now, generate questions from the provided document:
-
-${text}
-      `,
-    }],
-    temperature: 0.0,
-    response_format: { type: 'json_object' },
-  };
+  // Prepare models
+  let models;
+  switch (quality) {
+    case LLM_QUALITY_HIGH:
+      models = REASONING_MODELS;
+      break;
+    case LLM_QUALITY_MEDIUM:
+    default:
+      models = PROCESSING_MODELS;
+      break;
+  }
 
   // No cache, recreate it
-  const completion = await completionBackoff(promptPayload);
-  const content = completion.content;
+  const completion = await completionBackoff({
+    messages,
+    temperature,
+  }, models);
 
-  const response = {
-    questions: JSON.parse(content).questions,
+  return {
+    model: completion.model,
+    output: completion.content,
     costUSD: completion.costUSD,
   };
-
-  return response;
 }
 
 /**
@@ -219,14 +167,14 @@ async function chatStream({
     };
   }
 
-  const model = _.find(MODELS, (m) => m.model === 'gpt-4o');
+  const model = _.first(REASONING_MODELS);
 
   let text = '';
   const messages = [...(chatHistory || [])];
   messages.push({ role: 'user', content: query });
 
   const runner = await client.beta.chat.completions.runTools({
-    model: model.model,
+    model,
     temperature: 0.0,
     stream: true,
     stream_options: {
@@ -261,9 +209,10 @@ async function chatStream({
   }
 
   return {
+    model,
     costUSD: res.usage
-      ? (res.usage.prompt_tokens * model.cost_input_token)
-        + (res.usage.completion_tokens * model.cost_output_token)
+      ? (res.usage.prompt_tokens * config.get(`llm:pricing:${model}:input`))
+        + (res.usage.completion_tokens * config.get(`llm:pricing:${model}:output`))
       : 0,
     text,
     chatHistory: messages,
@@ -271,7 +220,6 @@ async function chatStream({
 }
 
 module.exports = {
-  summarize,
-  questionBank,
+  inference,
   chatStream,
 };

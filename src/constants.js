@@ -1,0 +1,17 @@
+const LLM_QUALITY_MEDIUM = 'medium';
+const LLM_QUALITY_HIGH = 'high';
+
+const LLM_CREATIVITY_NONE = 'none';
+const LLM_CREATIVITY_LOW = 'low';
+const LLM_CREATIVITY_MEDIUM = 'medium';
+const LLM_CREATIVITY_HIGH = 'high';
+
+module.exports = {
+  LLM_QUALITY_MEDIUM,
+  LLM_QUALITY_HIGH,
+
+  LLM_CREATIVITY_NONE,
+  LLM_CREATIVITY_LOW,
+  LLM_CREATIVITY_MEDIUM,
+  LLM_CREATIVITY_HIGH,
+};

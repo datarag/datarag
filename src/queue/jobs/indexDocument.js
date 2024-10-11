@@ -23,12 +23,153 @@ const cohere = require('../../llms/cohere');
 const openai = require('../../llms/openai');
 const { countWords } = require('../../helpers/utils');
 const { chunkifyMarkdown } = require('../../helpers/chunker');
+const { LLM_CREATIVITY_NONE, LLM_QUALITY_MEDIUM } = require('../../constants');
 
 const encoding = tiktoken.get_encoding('cl100k_base');
 const PARALLEL_SIZE = 10;
 
 function countTokens(text) {
   return encoding.encode(text).length;
+}
+
+/**
+ * Summarize
+ *
+ * @param {*} { text, maxWords }
+ * @return {String}
+ */
+async function summarize({ text, maxWords }) {
+  if (process.env.NODE_ENV === 'test') {
+    return {
+      summary: text,
+      context: text,
+      costUSD: 0,
+    };
+  }
+
+  const prompt = `
+  ## Instructions
+
+1. You are provided with a document that needs to be summarized.
+2. Your task is to create a concise summary of the document, capturing its key points and main ideas in up to ${maxWords} words.
+3. This summary will be used for embeddings and similarity search purposes.
+4. Ensure that the summary is clear, accurate, and retains the essence of the original document.
+5. After the summary is generated, also create a sort couple of sentences text that summarizes the summary, called context.
+
+Response in JSON format.
+
+Example response:
+{
+  "summary": "This is summary of the document",
+  "context": "This is a short summary of the summary"
+}
+
+## Document:
+${text}
+  `;
+
+  let completion;
+
+  try {
+    completion = await openai.inference({
+      text: prompt,
+      creativity: LLM_CREATIVITY_NONE,
+      quality: LLM_QUALITY_MEDIUM,
+    });
+  } catch (err) {
+    logger.error('summarize:openai', err);
+
+    try {
+      completion = await cohere.inference({
+        text: prompt,
+        creativity: LLM_CREATIVITY_NONE,
+        quality: LLM_QUALITY_MEDIUM,
+      });
+    } catch (err2) {
+      logger.error('summarize:cohere', err2);
+    }
+  }
+
+  const json = JSON.parse(completion.output);
+
+  const response = {
+    summary: json.summary,
+    context: json.context,
+    costUSD: completion.costUSD,
+  };
+
+  return response;
+}
+
+/**
+ * Question bank
+ *
+ * @param {*} { text }
+ * @return {String}
+ */
+async function questionBank({ text }) {
+  if (process.env.NODE_ENV === 'test') {
+    return {
+      questions: [],
+      costUSD: 0,
+    };
+  }
+
+  const prompt = `
+You are an AI designed to create a knowledge base by generating questions based on the provided document.
+Given the document below, return questions that can be directly answered using the information from the document.
+Ensure the questions are clear, concise, and relevant to the key details in the document, and return them in a JSON array format.
+
+# Instructions:
+1. Read the provided document carefully.
+2. Identify key details, facts, and concepts.
+3. Formulate questions based on these key details. Each question should be answerable using the available information from the document only.
+4. Ensure the questions cover a range of information from the text, including but not limited to definitions, explanations, dates, names, events, processes, and relationships.
+5. Do not refer to the "document" or "text" in the generated questions. Do not use these words.
+6. Return questions in a JSON array format.
+
+Example JSON reponse:
+{
+  "questions": [
+    "Question 1",
+    "Question 2",
+    "Question 3"
+  ]
+}
+
+Now, generate questions from the provided document:
+
+${text}
+  `;
+
+  let completion;
+
+  try {
+    completion = await openai.inference({
+      text: prompt,
+      creativity: LLM_CREATIVITY_NONE,
+      quality: LLM_QUALITY_MEDIUM,
+    });
+  } catch (err) {
+    logger.error('questionBank:openai', err);
+
+    try {
+      completion = await cohere.inference({
+        text: prompt,
+        creativity: LLM_CREATIVITY_NONE,
+        quality: LLM_QUALITY_MEDIUM,
+      });
+    } catch (err2) {
+      logger.error('questionBank:cohere', err2);
+    }
+  }
+
+  const response = {
+    questions: JSON.parse(completion.output).questions,
+    costUSD: completion.costUSD,
+  };
+
+  return response;
 }
 
 /**
@@ -88,7 +229,7 @@ async function indexDocument(payload) {
     let summary = '';
     let context = '';
     if (countWords(text) >= 200) {
-      const response = await openai.summarize({
+      const response = await summarize({
         text,
         maxWords: 200,
       });
@@ -149,7 +290,7 @@ async function indexDocument(payload) {
     const chunkGroups = _.chunk(chunkModels, PARALLEL_SIZE);
     for (let i = 0; i < chunkGroups.length; i += 1) {
       await Promise.all(_.map(chunkGroups[i], async (chunkModel) => {
-        const response = await openai.questionBank({ text: chunkModel.content });
+        const response = await questionBank({ text: chunkModel.content });
         indexCostUSD += response.costUSD;
         if (_.isEmpty(response.questions)) {
           return;
