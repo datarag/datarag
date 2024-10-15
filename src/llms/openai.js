@@ -76,11 +76,11 @@ async function completionBackoff(payload, models) {
 /**
  * Raw prompt over LLM
  *
- * @param {*} { text, instructions, creativity, quality }
+ * @param {*} { text, instructions, creativity, quality, json }
  * @return {*}
  */
 async function inference({
-  text, instructions, creativity, quality,
+  text, instructions, creativity, quality, json,
 }) {
   if (process.env.NODE_ENV === 'test') {
     return {
@@ -135,15 +135,19 @@ async function inference({
       break;
   }
 
-  // No cache, recreate it
-  const completion = await completionBackoff({
+  const openaiPayload = {
     messages,
     temperature,
-  }, models);
+  };
+
+  if (json) {
+    openaiPayload.response_format = { type: 'json_object' };
+  }
+  const completion = await completionBackoff(openaiPayload, models);
 
   return {
     model: completion.model,
-    output: completion.content,
+    output: json ? JSON.parse(completion.content) : completion.content,
     costUSD: completion.costUSD,
   };
 }

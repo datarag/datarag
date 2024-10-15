@@ -168,11 +168,11 @@ async function rerank({ query, chunks, threshold }) {
 /**
  * Raw prompt over LLM
  *
- * @param {*} { text, instructions, creativity, quality }
+ * @param {*} { text, instructions, creativity, quality, json }
  * @return {*}
  */
 async function inference({
-  text, instructions, creativity, quality,
+  text, instructions, creativity, quality, json,
 }) {
   if (process.env.NODE_ENV === 'test') {
     return {
@@ -227,18 +227,26 @@ async function inference({
       break;
   }
 
+  const coherePayload = {
+    model,
+    messages,
+    temperature,
+  };
+
+  if (json) {
+    coherePayload.responseFormat = { type: 'json_object' };
+  }
+
   let attempt = 0;
   while (attempt < MAX_RETRIES) {
     try {
-      const chatResponse = await cohere.chat({
-        model,
-        messages,
-        temperature,
-      }, COHERE_CLIENT_REQUEST_OPTIONS);
+      const chatResponse = await cohere.chat(coherePayload, COHERE_CLIENT_REQUEST_OPTIONS);
 
       return {
         model,
-        output: chatResponse.message.content[0].text,
+        output: json
+          ? JSON.parse(chatResponse.message.content[0].text)
+          : chatResponse.message.content[0].text,
         costUSD:
           chatResponse.usage.billedUnits.inputTokens * config.get(`llm:pricing:${model}:input`)
           + chatResponse.usage.billedUnits.outputTokens * config.get(`llm:pricing:${model}:output`),
