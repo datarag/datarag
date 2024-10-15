@@ -75,6 +75,7 @@ ${text}
       text: prompt,
       creativity: LLM_CREATIVITY_NONE,
       quality: LLM_QUALITY_MEDIUM,
+      json: true,
     });
   } catch (err) {
     logger.error('summarize:openai', err);
@@ -84,17 +85,16 @@ ${text}
         text: prompt,
         creativity: LLM_CREATIVITY_NONE,
         quality: LLM_QUALITY_MEDIUM,
+        json: true,
       });
     } catch (err2) {
       logger.error('summarize:cohere', err2);
     }
   }
 
-  const json = JSON.parse(completion.output);
-
   const response = {
-    summary: json.summary,
-    context: json.context,
+    summary: completion.output.summary,
+    context: completion.output.context,
     costUSD: completion.costUSD,
   };
 
@@ -149,6 +149,7 @@ ${text}
       text: prompt,
       creativity: LLM_CREATIVITY_NONE,
       quality: LLM_QUALITY_MEDIUM,
+      json: true,
     });
   } catch (err) {
     logger.error('questionBank:openai', err);
@@ -158,6 +159,7 @@ ${text}
         text: prompt,
         creativity: LLM_CREATIVITY_NONE,
         quality: LLM_QUALITY_MEDIUM,
+        json: true,
       });
     } catch (err2) {
       logger.error('questionBank:cohere', err2);
@@ -165,7 +167,7 @@ ${text}
   }
 
   const response = {
-    questions: JSON.parse(completion.output).questions,
+    questions: completion.output.questions,
     costUSD: completion.costUSD,
   };
 

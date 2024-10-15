@@ -16,11 +16,14 @@ module.exports = (router) => {
   *       type: object
   *       properties:
   *         message:
-  *           type: string
-  *           example: |
-  *             Machine learning is a subset of artificial intelligence that involves
-  *             the use of algorithms and statistical models.
-  *           description: The LLM message response.
+  *           oneOf:
+  *             - type: string
+  *               example: |
+  *                 Machine learning is a subset of artificial intelligence that involves
+  *                 the use of algorithms and statistical models.
+  *               description: The LLM message response.
+  *             - type: object
+  *               description: The LLM response in JSON.
   *
   *     NewInference:
   *       type: object
@@ -49,6 +52,13 @@ module.exports = (router) => {
   *           description: |
   *             Controls LLM selection to use,
   *             the higher the quality the more expensive model to use.
+  *         json:
+  *           type: boolean
+  *           default: false
+  *           description: |
+  *             Whether to respond as JSON object.
+  *
+  *             Important: The message should instruct the model to generate a JSON.
   */
 
   /**
@@ -155,6 +165,7 @@ module.exports = (router) => {
           instructions: payload.instructions,
           creativity: payload.creativity,
           quality: payload.quality,
+          json: !!payload.json,
         });
       } catch (err) {
         inferenceResponse = await cohere.inference({
@@ -162,6 +173,7 @@ module.exports = (router) => {
           instructions: payload.instructions,
           creativity: payload.creativity,
           quality: payload.quality,
+          json: !!payload.json,
         });
       }
 
