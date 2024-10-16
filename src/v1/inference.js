@@ -1,5 +1,5 @@
 const { nanoid } = require('nanoid');
-const { apiRoute } = require('../helpers/responses');
+const { apiRoute, badRequestResponse } = require('../helpers/responses');
 const logger = require('../logger');
 const openai = require('../llms/openai');
 const cohere = require('../llms/cohere');
@@ -58,7 +58,7 @@ module.exports = (router) => {
   *           description: |
   *             Whether to respond as JSON object.
   *
-  *             Important: The message should instruct the model to generate a JSON.
+  *             Important: Prompt and/or instructions should instruct the model to generate a JSON.
   */
 
   /**
@@ -139,11 +139,21 @@ module.exports = (router) => {
 
       const payload = req.body.data;
 
+      // Set defaults
       if (!payload.creativity) {
         payload.creativity = LLM_CREATIVITY_LOW;
       }
       if (!payload.quality) {
         payload.quality = LLM_QUALITY_HIGH;
+      }
+
+      // Validate JSON mode
+      if (payload.json) {
+        const msg = `${payload.instructions || ''} ${payload.prompt || ''}`;
+        if (!(/\bjson\b/i.test(msg))) {
+          badRequestResponse(req, res, 'The message should contain the word JSON');
+          return;
+        }
       }
 
       log('Inference started');

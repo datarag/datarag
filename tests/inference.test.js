@@ -52,6 +52,58 @@ describe('Inference API', () => {
       });
     });
 
+    it('should process a valid inference request in JSON mode (prompt)', async () => {
+      const agent = supertest.agent(app);
+
+      openai.inference.mockResolvedValue({
+        output: { foo: 'bar' },
+        model: 'gpt-4o',
+        costUSD: 0.001,
+      });
+
+      const res = await agent
+        .post('/v1/inference')
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            prompt: 'What is machine learning? Respond in JSON.',
+            instructions: 'You are a helpful assistant',
+            creativity: 'low',
+            quality: 'high',
+            json: true,
+          },
+        });
+
+      expect(res.statusCode).toEqual(200);
+      expect(res.body.data.message).toEqual({ foo: 'bar' });
+    });
+
+    it('should process a valid inference request in JSON mode (instructions)', async () => {
+      const agent = supertest.agent(app);
+
+      openai.inference.mockResolvedValue({
+        output: { foo: 'bar' },
+        model: 'gpt-4o',
+        costUSD: 0.001,
+      });
+
+      const res = await agent
+        .post('/v1/inference')
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            prompt: 'What is machine learning?',
+            instructions: 'You are a helpful assistant. Respond in JSON.',
+            creativity: 'low',
+            quality: 'high',
+            json: true,
+          },
+        });
+
+      expect(res.statusCode).toEqual(200);
+      expect(res.body.data.message).toEqual({ foo: 'bar' });
+    });
+
     it('should fallback to cohere if openai fails', async () => {
       const agent = supertest.agent(app);
 
@@ -128,6 +180,27 @@ describe('Inference API', () => {
           path: '/body/data/prompt',
         }],
         message: 'request/body/data must have required property \'prompt\'',
+      });
+    });
+
+    it('should return 400 error for invalid json reply', async () => {
+      const agent = supertest.agent(app);
+
+      const res = await agent
+        .post('/v1/inference')
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            prompt: 'What is machine learning?',
+            instructions: 'You are a helpful assistant',
+            json: true,
+          },
+        });
+
+      expect(res.statusCode).toEqual(400);
+      expect(res.body).toEqual({
+        errors: ['The message should contain the word JSON'],
+        message: 'Bad request',
       });
     });
 
