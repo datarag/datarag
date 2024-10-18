@@ -324,8 +324,8 @@ module.exports = (router) => {
               });
               reqRagLog.endMeasure();
 
-              if (_.isArray(response.data.data)) {
-                log(`Received ${connector.endpoint} [${connector.method}]: ${response.data.data.length} data`);
+              if (response.data.data) {
+                log(`Received ${connector.endpoint} [${connector.method}] data`);
                 return response.data.data;
               }
               log(`No data received ${connector.endpoint} [${connector.method}]`);
