@@ -467,7 +467,7 @@ module.exports = (router) => {
 Utilize the information available in your knowledge base and the retriever tools to generate a comprehensive and
 concise response to the question below.
 
-Ensure your answer is directly relevant to the question asked.
+Ensure your answer is relevant to the question asked.
 
 If initial attempts do not yield sufficient information, use semantically different queries with the retriever tools to gather more data.
 
@@ -475,7 +475,8 @@ Make multiple attempts if necessary to ensure the question is completely and acc
 
 If in doubt, always call the 'searchKnowledgebase' function with a best guess query.
 
-If you cannot produce a relevant answer, ask for additional information to be able to use the retrievers, or respond using the phrase:
+If you cannot produce a relevant answer, ask for additional information to be able to use the retrievers, or respond using the
+following phrase, after being translated to the detected language of the user input question:
 ${cannedResponse}
 
 ---
