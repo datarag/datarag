@@ -407,10 +407,10 @@ describe('chunkifyMarkdown', () => {
 
   it('should handle markdown with nested headings correctly', () => {
     const markdownText = `
-      # Header 1
+      # *Header 1*
       This is a paragraph under header 1. It should be split properly into chunks.
 
-      ## Subheader 1.1
+      ## **Subheader 1.1**
       This is a paragraph under subheader 1.1. It continues with more text that could be long enough to need splitting.
 
       ### Subheader 1.1.1

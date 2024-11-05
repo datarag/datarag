@@ -149,13 +149,13 @@ function chunkifyMarkdown(markDownText, chunkSize = 200, chunkWindow = 50) {
       _.each(sections, (section) => {
         recursiveSplit(
           section.text,
-          _.compact(_.uniq([...headings, section.heading])),
+          _.compact(_.uniq([...headings, flattenText(section.heading)])),
           depth + 1,
         );
       });
       return;
     }
-    const subHeadings = _.compact(_.uniq([...headings, sections[0].heading]));
+    const subHeadings = _.compact(_.uniq([...headings, flattenText(sections[0].heading)]));
     // eslint-disable-next-line no-param-reassign
     textBlock = sections[0].text;
     if (countWords(textBlock) <= chunkSize) {

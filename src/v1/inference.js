@@ -5,7 +5,7 @@ const openai = require('../llms/openai');
 const cohere = require('../llms/cohere');
 const { TreeNode } = require('../helpers/treenode');
 const { SCOPE_CHAT } = require('../scopes');
-const { LLM_CREATIVITY_LOW, LLM_QUALITY_HIGH } = require('../constants');
+const { LLM_QUALITY_HIGH, LLM_CREATIVITY_HIGH } = require('../constants');
 
 module.exports = (router) => {
   /**
@@ -41,7 +41,7 @@ module.exports = (router) => {
   *         creativity:
   *           type: string
   *           example: 'none'
-  *           default: 'low'
+  *           default: 'high'
   *           enum: [none, low, medium, high]
   *           description: How creative the LLM should be (controls LLM temperature).
   *         quality:
@@ -141,7 +141,7 @@ module.exports = (router) => {
 
       // Set defaults
       if (!payload.creativity) {
-        payload.creativity = LLM_CREATIVITY_LOW;
+        payload.creativity = LLM_CREATIVITY_HIGH;
       }
       if (!payload.quality) {
         payload.quality = LLM_QUALITY_HIGH;
