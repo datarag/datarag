@@ -179,7 +179,7 @@ async function chatStream({
 
   const runner = await client.beta.chat.completions.runTools({
     model,
-    temperature: 0.0,
+    temperature: 0.1,
     stream: true,
     stream_options: {
       include_usage: true,
