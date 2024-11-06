@@ -58,11 +58,12 @@ async function findDatasourceIds({ organization, agentResId, datasourceResIds })
  * Given a user query, return a vector version
  *
  * @param {String} queryText
+ * @param {String} queryType [query | document]
  * @return {*}
  */
-async function prepareQuery(queryText) {
+async function prepareQuery(queryText, queryType = 'query') {
   const query = flattenText(cleanText(queryText));
-  const key = `embedding:${md5(query)}`;
+  const key = `embedding:${queryType}:${md5(query)}`;
 
   // Check for cached response
   const existingVector = await registry.get(key);
@@ -76,7 +77,7 @@ async function prepareQuery(queryText) {
 
   const queryAI = await createEmbeddings({
     texts: [query],
-    type: 'query',
+    type: queryType,
   });
   const queryVector = queryAI.embeddings[0];
 
@@ -495,7 +496,7 @@ async function retrieveQuestions({
 
   // create a vector on the query
   logger.debug('retrieveQuestions', `Embedding query: ${prompt}`);
-  const { query, queryVector, costUSD: qCostUSD } = await prepareQuery(prompt);
+  const { query, queryVector, costUSD: qCostUSD } = await prepareQuery(prompt, 'document');
   costUSD += qCostUSD;
 
   logger.debug('retrieveQuestions', `Semantic search: ${query}`);
