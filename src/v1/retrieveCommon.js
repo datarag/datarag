@@ -1,6 +1,8 @@
 /* eslint-disable consistent-return */
 const _ = require('lodash');
+const md5 = require('../helpers/md5');
 const db = require('../db/models');
+const registry = require('../registry');
 const { flattenText, cleanText } = require('../helpers/chunker');
 const { createEmbeddings, rerank } = require('../llms/cohere');
 const { fullTextSearch } = require('../agents/fullTextSearch');
@@ -60,11 +62,26 @@ async function findDatasourceIds({ organization, agentResId, datasourceResIds })
  */
 async function prepareQuery(queryText) {
   const query = flattenText(cleanText(queryText));
+  const key = `embedding:${md5(query)}`;
+
+  // Check for cached response
+  const existingVector = await registry.get(key);
+  if (existingVector) {
+    return {
+      query,
+      queryVector: existingVector,
+      costUSD: 0,
+    };
+  }
+
   const queryAI = await createEmbeddings({
     texts: [query],
     type: 'query',
   });
   const queryVector = queryAI.embeddings[0];
+
+  // Add to cache for 10'
+  await registry.set(key, queryVector, 10 * 60);
 
   return {
     query,
@@ -446,6 +463,148 @@ async function retrieveChunks({
 }
 
 /**
+ * Retrieve question chunks
+ *
+ * @param {*} {
+ *   organization, datasourceIds, prompt,
+ *   maxChunks
+ * }
+ * @return {*}
+ */
+async function retrieveQuestions({
+  organization, datasourceIds, prompt,
+  maxChunks, ragLog,
+}) {
+  let costUSD = 0;
+  let chunks = [];
+
+  const retrieveRagLog = ragLog.addChild(new TreeNode({
+    type: 'retrieval',
+    query: prompt,
+    total_chunks: await db.Chunk.count({
+      where: {
+        OrganizationId: organization.id,
+        DatasourceId: {
+          [Op.in]: datasourceIds,
+        },
+        type: 'question',
+      },
+    }),
+  }));
+  retrieveRagLog.startMeasure();
+
+  // create a vector on the query
+  logger.debug('retrieveQuestions', `Embedding query: ${prompt}`);
+  const { query, queryVector, costUSD: qCostUSD } = await prepareQuery(prompt);
+  costUSD += qCostUSD;
+
+  logger.debug('retrieveQuestions', `Semantic search: ${query}`);
+
+  // Add to Rag Log
+  const searchRagLog = retrieveRagLog.addChild(new TreeNode({
+    type: 'semantic_search',
+    query,
+  }));
+  searchRagLog.startMeasure();
+
+  const searchResponse = await semanticSearch({
+    query,
+    queryVector,
+    organizationId: organization.id,
+    datasourceIds,
+    type: 'question',
+    limit: maxChunks,
+  });
+  costUSD += searchResponse.costUSD;
+
+  searchRagLog.endMeasure();
+
+  logger.debug('retrieveQuestions', `Semantic search yield ${searchResponse.data.length} results`);
+
+  // Add regular chunks
+  chunks = searchResponse.data;
+
+  // Register Rag Log response
+  _.each(chunks, (chunk) => {
+    searchRagLog.addChild(new TreeNode({
+      type: 'chunk',
+      similarity: chunk.similarity,
+      chunk_ref: chunk.id,
+      datasource_ref: chunk.DatasourceId,
+      document_ref: chunk.DocumentId,
+    }));
+  });
+
+  // Final processing for relations
+  const datasourceMap = {};
+  const documentMap = {};
+
+  await Promise.all([
+    (async () => {
+      // Find documents
+      const documentIds = _.uniq(_.map(chunks, (chunk) => chunk.DocumentId));
+      const documents = await organization.getDocuments({
+        where: {
+          DatasourceId: {
+            [Op.in]: datasourceIds,
+          },
+          id: {
+            [Op.in]: documentIds,
+          },
+        },
+        attributes: ['id', 'resId', 'metadata'],
+      });
+      _.each(documents, (document) => {
+        documentMap[document.id] = {
+          resId: document.resId,
+          metadata: document.metadata,
+        };
+      });
+    })(),
+    (async () => {
+      // Find datasources
+      const datasources = await organization.getDatasources({
+        where: {
+          id: {
+            [Op.in]: datasourceIds,
+          },
+        },
+        attributes: ['id', 'resId'],
+      });
+      _.each(datasources, (datasource) => {
+        datasourceMap[datasource.id] = {
+          resId: datasource.resId,
+        };
+      });
+    })(),
+  ]);
+
+  // Prepare response
+  const response = [];
+  _.each(chunks, (chunk) => {
+    const datasource = datasourceMap[chunk.DatasourceId];
+    const document = documentMap[chunk.DocumentId];
+    if (!datasource || !document) return;
+    response.push({
+      datasource_id: datasource.resId,
+      document_id: document.resId,
+      text: chunk.content,
+      metadata: document.metadata,
+      size: chunk.contentSize,
+      tokens: chunk.contentTokens,
+      score: chunk.similarity,
+    });
+  });
+
+  retrieveRagLog.endMeasure();
+
+  return {
+    chunks: response,
+    costUSD,
+  };
+}
+
+/**
  * Retrieve documents
  *
  * @param {*} {
@@ -632,5 +791,6 @@ module.exports = {
   prepareQuery,
   retrieveChunks,
   retrieveDocuments,
+  retrieveQuestions,
   createSnippets,
 };

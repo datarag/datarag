@@ -10,21 +10,26 @@ const THRESHOLD = config.get('retrieval:embeddings:threshold');
  * Perform semantic search on database
  *
  * @param {*} {
- *   query, queryVector, organizationId, datasourceIds, limit, offset,
+ *   query, queryVector, organizationId, datasourceIds, limit, offset, type
  * }
  * @return {*}
  */
 async function semanticSearch({
-  query, queryVector, organizationId, datasourceIds, limit, offset,
+  query, queryVector, organizationId, datasourceIds, limit, offset, type,
 }) {
   if (!organizationId) throw new Error('Missing organizationId');
   if (_.isEmpty(datasourceIds)) throw new Error('Missing datasourceIds');
   if (!query || !queryVector) throw new Error('Missing query/vector');
 
+  const filter = type
+    ? `"type" = '${type}' AND `
+    : '';
+
   const similarities = await db.sequelize.query(`
     SELECT (1 - ("embedding" <=> :vector)) as similarity
     FROM "${db.Chunk.tableName}"
     WHERE
+      ${filter}
       "OrganizationId" = :orgid AND
       "DatasourceId" IN (:dsids) AND
       (1 - ("embedding" <=> :vector)) > 0
@@ -49,6 +54,7 @@ async function semanticSearch({
         (1 - ("embedding" <=> :vector)) as similarity
       FROM "${db.Chunk.tableName}"
       WHERE
+        ${filter}
         "OrganizationId" = :orgid AND
         "DatasourceId" IN (:dsids) AND
         (1 - ("embedding" <=> :vector)) >= ${THRESHOLD * median}

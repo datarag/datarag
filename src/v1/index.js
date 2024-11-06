@@ -105,6 +105,7 @@ require('./documents')(router);
 require('./connectors')(router);
 require('./retrieveChunks')(router);
 require('./retrieveDocuments')(router);
+require('./retrieveQuestions')(router);
 require('./chat')(router);
 require('./inference')(router);
 require('./reports')(router);
