@@ -522,8 +522,8 @@ async function retrieveQuestions({
 
   logger.debug('retrieveQuestions', `Semantic search yield ${searchResponse.data.length} results`);
 
-  // Add regular chunks
-  chunks = searchResponse.data;
+  // Filter duplicate chunks
+  chunks = _.uniqBy(searchResponse.data, 'content');
 
   // Register Rag Log response
   _.each(chunks, (chunk) => {
