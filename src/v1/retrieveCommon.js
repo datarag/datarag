@@ -525,6 +525,10 @@ async function retrieveQuestions({
   // Filter duplicate chunks
   chunks = _.uniqBy(searchResponse.data, 'content');
 
+  // Remove questions that match the prompt
+  const locasePrompt = _.trim(_.toLower(prompt));
+  chunks = _.filter(chunks, (chunk) => _.trim(_.toLower(chunk.content)) !== locasePrompt);
+
   // Register Rag Log response
   _.each(chunks, (chunk) => {
     searchRagLog.addChild(new TreeNode({
