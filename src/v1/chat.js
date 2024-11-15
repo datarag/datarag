@@ -405,11 +405,19 @@ module.exports = (router) => {
         };
       }
 
-      if (!_.isEmpty(searchDataSourceIds)) {
+      async function searchEmptyKnowledgebase(args) {
+        logger.debug('datasource:call', 'searchEmptyKnowledgebase');
+        logger.debug('datasource:args', JSON.stringify(args, null, 2));
+        return '';
+      }
+
+      if (!_.isEmpty(searchDataSourceIds) || _.isEmpty(tools)) {
         const fields = {
           type: 'function',
           function: {
-            function: searchKnowledgebase,
+            function: _.isEmpty(searchDataSourceIds)
+              ? searchEmptyKnowledgebase
+              : searchKnowledgebase,
             description: 'Search knowledge base for information related to user input.',
             parse: JSON.parse,
             parameters: {
