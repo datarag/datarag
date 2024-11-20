@@ -32,6 +32,10 @@ module.exports = (router) => {
   *           description: |
   *             The purpose of this datasource. Please be as descriptive as possible so that LLMs
   *             have a good understanding about the content encapsulated.
+  *         date:
+  *           type: string
+  *           example: '2024-11-20T06:50:31.958Z'
+  *           description: Datasource creation datetime
   *
   *     NewDatasource:
   *       type: object

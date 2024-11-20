@@ -38,6 +38,7 @@ describe('Connectors API', () => {
           endpoint: 'https://www.example.com',
           method: 'get',
           payload: {},
+          date: res.body.data[0].date,
           metadata: {
             foo: 'bar',
           },
@@ -121,6 +122,7 @@ describe('Connectors API', () => {
             description: 'Foo',
           },
         },
+        date: res.body.data.date,
         metadata: { key: 'value' },
       });
 
@@ -184,6 +186,7 @@ describe('Connectors API', () => {
             description: 'Foo',
           },
         },
+        date: res.body.data.date,
         metadata: { key: 'value' },
       });
 

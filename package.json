@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@opendocsg/pdf2md": "^0.1.31",
-    "@sentry/node": "^8.36.0",
+    "@sentry/node": "^8.39.0",
     "axios": "^1.7.7",
     "body-parser": "^1.20.2",
     "bull": "^4.16.4",
@@ -33,13 +33,13 @@
     "express-openapi-validator": "^5.3.9",
     "ioredis": "^5.4.1",
     "lodash": "^4.17.21",
-    "marked": "^14.1.3",
+    "marked": "^15.0.1",
     "nanoid": "^3.3.7",
     "nconf": "^0.12.1",
-    "newrelic": "^12.6.0",
+    "newrelic": "^12.8.0",
     "node-html-markdown": "^1.3.0",
     "nunjucks": "^3.2.4",
-    "openai": "^4.71.0",
+    "openai": "^4.72.0",
     "pg": "^8.13.1",
     "pg-hstore": "^2.3.4",
     "pgvector": "^0.2.0",
@@ -51,7 +51,7 @@
     "tiktoken": "^1.0.17",
     "wink-eng-lite-web-model": "^1.8.0",
     "wink-nlp": "^2.3.0",
-    "winston": "^3.16.0"
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "eslint": "^8.57.1",

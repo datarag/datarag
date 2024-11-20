@@ -35,6 +35,7 @@ describe('Agent API', () => {
           id: TOKEN,
           name: TOKEN,
           purpose: TOKEN,
+          date: res.body.data[0].date,
         }],
       });
     });
@@ -86,6 +87,7 @@ describe('Agent API', () => {
         id: 'new-agent',
         name: 'New Agent',
         purpose: 'A new agent purpose',
+        date: res.body.data.date,
       });
 
       const model = await db.Agent.findOne({
@@ -137,6 +139,7 @@ describe('Agent API', () => {
         id: TOKEN,
         name: TOKEN,
         purpose: TOKEN,
+        date: res.body.data.date,
       });
     });
 
@@ -168,6 +171,7 @@ describe('Agent API', () => {
         id: TOKEN,
         name: 'Updated Agent',
         purpose: 'An updated agent purpose',
+        date: res.body.data.date,
       });
 
       const model = await db.Agent.findOne({
@@ -196,6 +200,7 @@ describe('Agent API', () => {
         id: TOKEN,
         name: 'Updated Agent',
         purpose: factory.agent.purpose,
+        date: res.body.data.date,
       });
     });
 
@@ -215,6 +220,7 @@ describe('Agent API', () => {
         id: TOKEN,
         name: factory.agent.name,
         purpose: 'Updated purpose',
+        date: res.body.data.date,
       });
     });
 
@@ -315,6 +321,7 @@ describe('Agent API', () => {
           id: TOKEN,
           name: TOKEN,
           purpose: TOKEN,
+          date: res.body.data[0].date,
         }],
       });
     });

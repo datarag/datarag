@@ -35,6 +35,7 @@ describe('Datasources API', () => {
           id: TOKEN,
           name: TOKEN,
           purpose: TOKEN,
+          date: res.body.data[0].date,
         }],
       });
     });
@@ -87,6 +88,7 @@ describe('Datasources API', () => {
         id: 'new-datasource',
         name: 'New Datasource',
         purpose: 'A new datasource purpose',
+        date: res.body.data.date,
       });
 
       const model = await db.Datasource.findOne({
@@ -138,6 +140,7 @@ describe('Datasources API', () => {
         id: TOKEN,
         name: TOKEN,
         purpose: TOKEN,
+        date: res.body.data.date,
       });
     });
 
@@ -169,6 +172,7 @@ describe('Datasources API', () => {
         id: TOKEN,
         name: 'Updated Datasource',
         purpose: 'An updated datasource purpose',
+        date: res.body.data.date,
       });
 
       const model = await db.Datasource.findOne({
@@ -197,6 +201,7 @@ describe('Datasources API', () => {
         id: TOKEN,
         name: 'Updated Datasource',
         purpose: factory.datasource.purpose,
+        date: res.body.data.date,
       });
     });
 
@@ -216,6 +221,7 @@ describe('Datasources API', () => {
         id: TOKEN,
         name: factory.datasource.name,
         purpose: 'Updated purpose',
+        date: res.body.data.date,
       });
     });
 
