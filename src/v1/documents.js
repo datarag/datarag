@@ -1,4 +1,20 @@
+/* eslint-disable no-loop-func */
+// Polyfill for pdfjs
+if (typeof Promise.withResolvers === 'undefined') {
+  Promise.withResolvers = function pf() {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+}
+
 const _ = require('lodash');
+const pdf2md = require('@opendocsg/pdf2md');
+const { NodeHtmlMarkdown } = require('node-html-markdown');
 const { apiRoute, notFoundResponse, badRequestResponse } = require('../helpers/responses');
 const { serializeDocument } = require('../helpers/serialize');
 const { generateRandomHash } = require('../helpers/tokens');
@@ -276,14 +292,39 @@ module.exports = (router) => {
       const payload = req.body.data;
       const resId = payload.id;
 
-      let { content } = payload;
+      // Original content
+      const contentSource = payload.content;
+      // Markdown content
+      let content = contentSource;
+      // Preprocess
       if (payload.type === 'url') {
         try {
-          content = await fetchAndCleanHtml(payload.content);
+          content = await fetchAndCleanHtml(contentSource);
         } catch (err) {
           badRequestResponse(req, res, 'Provided URL is invalid or unreachable');
           return;
         }
+      }
+      // Convert text to Markdown
+      switch (payload.type) {
+        case 'pdf':
+          content = await pdf2md(Uint8Array.from(atob(content), (c) => c.charCodeAt(0)));
+          break;
+        case 'url':
+        case 'html':
+          content = NodeHtmlMarkdown.translate(content);
+          break;
+        case 'text':
+        case 'markdown':
+        default:
+          break;
+      }
+
+      content = (content || '').trim();
+
+      if (!content) {
+        badRequestResponse(req, res, 'Could not process content');
+        return;
       }
 
       const fields = {
@@ -292,9 +333,10 @@ module.exports = (router) => {
         resId: resId || `doc-${generateRandomHash()}`,
         name: payload.name,
         content,
+        contentSource,
         contentType: payload.type,
-        contentHash: md5(payload.content),
-        contentSize: payload.content.length,
+        contentHash: md5(content),
+        contentSize: content.length,
         metadata: payload.metadata || {},
       };
 
