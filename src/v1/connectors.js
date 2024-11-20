@@ -46,6 +46,10 @@ module.exports = (router) => {
   *           type: object
   *           description: API payload parameters.
   *           additionalProperties: true
+  *         date:
+  *           type: string
+  *           example: '2024-11-20T06:50:31.958Z'
+  *           description: Connector creation datetime
   *         metadata:
   *           type: object
   *           description: JSON metadata associated with the connector.

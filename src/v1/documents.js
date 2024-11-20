@@ -48,6 +48,10 @@ module.exports = (router) => {
   *           type: integer
   *           example: 50234
   *           description: Document size in bytes.
+  *         date:
+  *           type: string
+  *           example: '2024-11-20T06:50:31.958Z'
+  *           description: Document creation datetime
   *         metadata:
   *           type: object
   *           description: |

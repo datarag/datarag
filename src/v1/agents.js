@@ -32,6 +32,11 @@ module.exports = (router) => {
   *             What this agent is all about.
   *             Make it as descriptive as possible, so that LLM has a good understanding
   *             of the functionality of the agent.
+  *         date:
+  *           type: string
+  *           example: '2024-11-20T06:50:31.958Z'
+  *           description: Agent creation datetime
+  *
   *     NewAgent:
   *       type: object
   *       required:

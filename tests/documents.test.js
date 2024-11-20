@@ -41,6 +41,7 @@ describe('Documents API', () => {
           size: 4,
           status: 'indexed',
           type: 'text',
+          date: res.body.data[0].date,
         }],
       });
     });

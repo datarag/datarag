@@ -9,6 +9,7 @@ function serializeDatasource(model) {
     id: model.resId,
     name: model.name,
     purpose: model.purpose,
+    date: model.createdAt.toISOString(),
   };
 }
 
@@ -23,6 +24,7 @@ function serializeAgent(model) {
     id: model.resId,
     name: model.name,
     purpose: model.purpose,
+    date: model.createdAt.toISOString(),
   };
 }
 
@@ -40,6 +42,7 @@ function serializeDocument(model) {
     status: model.status,
     hash: model.contentHash,
     size: model.contentSize,
+    date: model.createdAt.toISOString(),
     metadata: model.metadata,
   };
 }
@@ -59,6 +62,7 @@ function serializeConnector(model) {
     method: model.method,
     payload: model.payload,
     metadata: model.metadata,
+    date: model.createdAt.toISOString(),
   };
 }
 
