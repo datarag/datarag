@@ -64,6 +64,7 @@ async function setupOrg(name) {
     resId: name,
     name,
     content: name,
+    contentSource: name,
     contentType: 'text',
     contentHash: 'abcd',
     contentSize: 4,

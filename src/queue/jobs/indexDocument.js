@@ -1,20 +1,5 @@
 /* eslint-disable no-loop-func */
-// Polyfill for pdfjs
-if (typeof Promise.withResolvers === 'undefined') {
-  Promise.withResolvers = function pf() {
-    let resolve;
-    let reject;
-    const promise = new Promise((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    return { promise, resolve, reject };
-  };
-}
-
-const { NodeHtmlMarkdown } = require('node-html-markdown');
 const _ = require('lodash');
-const pdf2md = require('@opendocsg/pdf2md');
 const tiktoken = require('tiktoken');
 const db = require('../../db/models');
 const logger = require('../../logger');
@@ -185,27 +170,7 @@ async function indexDocument(payload) {
 
   try {
     let indexCostUSD = 0;
-    let text = '';
-
-    // ----------------------------------- CLEAN DATA ----------------------------------------------
-
-    // Convert text to Markdown
-    logger.info(`index:${payload.document_id}`, 'Clean data');
-    switch (document.contentType) {
-      case 'text':
-      case 'markdown':
-        text = document.content;
-        break;
-      case 'pdf':
-        text = await pdf2md(Uint8Array.from(atob(document.content), (c) => c.charCodeAt(0)));
-        break;
-      case 'url':
-      case 'html':
-        text = NodeHtmlMarkdown.translate(document.content);
-        break;
-      default:
-        throw new Error('Unknown content type');
-    }
+    const text = document.content;
 
     if (!text) {
       throw new Error('Text is empty');

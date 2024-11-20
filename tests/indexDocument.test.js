@@ -1,4 +1,3 @@
-const fs = require('fs');
 const { setupOrg, tearDownOrg, waitWorker } = require('./factory');
 const indexDocument = require('../src/queue/jobs/indexDocument');
 
@@ -18,7 +17,7 @@ describe('IndexDocument Worker', () => {
     await tearDownOrg(OTHER_TOKEN);
   });
 
-  it('should index text', async () => {
+  it('should index', async () => {
     await factory.document.update({
       content: 'Hello world',
       contentType: 'text',
@@ -33,76 +32,5 @@ describe('IndexDocument Worker', () => {
     const chunks = await factory.document.getChunks();
     expect(chunks.length).toBeGreaterThan(0);
     expect(chunks[0].content).toEqual('Hello world');
-  });
-
-  it('should index markdown', async () => {
-    await factory.document.update({
-      content: '*Hello world*',
-      contentType: 'markdown',
-    });
-
-    await indexDocument({
-      document_id: factory.document.id,
-    });
-
-    waitWorker();
-
-    const chunks = await factory.document.getChunks();
-    expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks[0].content).toEqual('*Hello world*');
-  });
-
-  it('should index html', async () => {
-    await factory.document.update({
-      content: '<b>Hello world</b>',
-      contentType: 'html',
-    });
-
-    await indexDocument({
-      document_id: factory.document.id,
-    });
-
-    waitWorker();
-
-    const chunks = await factory.document.getChunks();
-    expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks[0].content).toEqual('**Hello world**');
-  });
-
-  it('should index url', async () => {
-    await factory.document.update({
-      content: '<b>Hello world</b>',
-      contentType: 'url',
-    });
-
-    await indexDocument({
-      document_id: factory.document.id,
-    });
-
-    waitWorker();
-
-    const chunks = await factory.document.getChunks();
-    expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks[0].content).toContain('**Hello world**');
-  });
-
-  it('should index pdf', async () => {
-    const binaryData = fs.readFileSync(`${__dirname}/helloworld.pdf`);
-    const base64String = binaryData.toString('base64');
-
-    await factory.document.update({
-      content: base64String,
-      contentType: 'pdf',
-    });
-
-    await indexDocument({
-      document_id: factory.document.id,
-    });
-
-    waitWorker();
-
-    const chunks = await factory.document.getChunks();
-    expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks[0].content).toContain('Hello, world!');
   });
 });

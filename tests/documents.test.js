@@ -1,3 +1,4 @@
+const fs = require('fs');
 const supertest = require('supertest');
 const { app } = require('../src/server');
 const { setupOrg, tearDownOrg, waitWorker } = require('./factory');
@@ -120,6 +121,93 @@ describe('Documents API', () => {
       await waitWorker();
       await model.reload();
       expect(model.status).toEqual('indexed');
+    });
+
+    it('should create an html document', async () => {
+      const agent = supertest.agent(app);
+      const res = await agent
+        .post(`/v1/datasources/${factory.datasource.resId}/documents`)
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            id: 'new-document',
+            name: 'New Document',
+            type: 'html',
+            content: '<b>Hello World</b>',
+            metadata: { key: 'value' },
+          },
+        });
+
+      expect(res.statusCode).toEqual(200);
+      await waitWorker();
+
+      const model = await db.Document.findOne({
+        where: {
+          resId: 'new-document',
+          DatasourceId: factory.datasource.id,
+        },
+      });
+      expect(model.status).toEqual('indexed');
+      expect(model.content).toEqual('**Hello World**');
+    });
+
+    it('should create a markdown document', async () => {
+      const agent = supertest.agent(app);
+      const res = await agent
+        .post(`/v1/datasources/${factory.datasource.resId}/documents`)
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            id: 'new-document',
+            name: 'New Document',
+            type: 'markdown',
+            content: '## Hello World',
+            metadata: { key: 'value' },
+          },
+        });
+
+      expect(res.statusCode).toEqual(200);
+      await waitWorker();
+
+      const model = await db.Document.findOne({
+        where: {
+          resId: 'new-document',
+          DatasourceId: factory.datasource.id,
+        },
+      });
+      expect(model.status).toEqual('indexed');
+      expect(model.content).toEqual('## Hello World');
+    });
+
+    it('should create a PDF document', async () => {
+      const binaryData = fs.readFileSync(`${__dirname}/helloworld.pdf`);
+      const base64String = binaryData.toString('base64');
+
+      const agent = supertest.agent(app);
+      const res = await agent
+        .post(`/v1/datasources/${factory.datasource.resId}/documents`)
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            id: 'new-document',
+            name: 'New Document',
+            type: 'pdf',
+            content: base64String,
+            metadata: { key: 'value' },
+          },
+        });
+
+      expect(res.statusCode).toEqual(200);
+      await waitWorker();
+
+      const model = await db.Document.findOne({
+        where: {
+          resId: 'new-document',
+          DatasourceId: factory.datasource.id,
+        },
+      });
+      expect(model.status).toEqual('indexed');
+      expect(model.content).toEqual('Hello, world!');
     });
 
     it('should update an existing document', async () => {
