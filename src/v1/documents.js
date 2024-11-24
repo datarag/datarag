@@ -14,7 +14,7 @@ if (typeof Promise.withResolvers === 'undefined') {
 
 const _ = require('lodash');
 const pdf2md = require('@opendocsg/pdf2md');
-const { NodeHtmlMarkdown } = require('node-html-markdown');
+const TurndownService = require('turndown');
 const { apiRoute, notFoundResponse, badRequestResponse } = require('../helpers/responses');
 const { serializeDocument } = require('../helpers/serialize');
 const { generateRandomHash } = require('../helpers/tokens');
@@ -26,6 +26,7 @@ const { fetchAndCleanHtml } = require('../helpers/utils');
 const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
 
 const { Op } = db.Sequelize;
+const turndownService = new TurndownService();
 
 module.exports = (router) => {
   /**
@@ -312,7 +313,7 @@ module.exports = (router) => {
           break;
         case 'url':
         case 'html':
-          content = NodeHtmlMarkdown.translate(content);
+          content = turndownService.turndown(content);
           break;
         case 'text':
         case 'markdown':

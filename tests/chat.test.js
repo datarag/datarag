@@ -2,10 +2,9 @@ const supertest = require('supertest');
 const { app } = require('../src/server');
 const { setupOrg, tearDownOrg } = require('./factory');
 const { SCOPE_CHAT } = require('../src/scopes');
-const { chatStream } = require('../src/llms/openai');
+const { chatStream, inference } = require('../src/llms/openai');
 const { getCannedResponse } = require('../src/helpers/cannedResponse');
 
-jest.mock('../src/llms/openai');
 jest.mock('../src/helpers/cannedResponse');
 
 const TOKEN = 'org_chat_token';
@@ -27,10 +26,16 @@ describe('Chat API', () => {
       const agent = supertest.agent(app);
 
       chatStream.mockResolvedValue({
-        text: 'Machine learning is a subset of AI.',
+        text: '{ "response": "Machine learning is a subset of AI." }',
         model: 'gpt-4o',
         costUSD: 0.001,
-        chatHistory: [{ role: 'user', content: 'What is machine learning?' }],
+        messages: [{ role: 'user', content: 'What is machine learning?' }],
+      });
+
+      inference.mockResolvedValue({
+        model: 'gpt-test',
+        output: { classification: 'unknown' },
+        costUSD: 0,
       });
 
       const res = await agent
@@ -56,15 +61,21 @@ describe('Chat API', () => {
       const agent = supertest.agent(app);
 
       chatStream.mockImplementation(async ({ streamFn }) => {
-        await streamFn('Machine');
+        await streamFn('{ "response": "Machine');
         await streamFn(' learning is');
         await streamFn(' a subset of AI.');
         return {
-          text: 'Machine learning is a subset of AI.',
+          text: '{ "response": "Machine learning is a subset of AI." }',
           model: 'gpt-4o',
           costUSD: 0.001,
-          chatHistory: [{ role: 'user', content: 'What is machine learning?' }],
+          messages: [{ role: 'user', content: 'What is machine learning?' }],
         };
+      });
+
+      inference.mockResolvedValue({
+        model: 'gpt-test',
+        output: 'unknown',
+        costUSD: 0,
       });
 
       const res = await agent
@@ -117,7 +128,13 @@ describe('Chat API', () => {
         text: '',
         model: 'gpt-4o',
         costUSD: 0.001,
-        chatHistory: [],
+        messages: [],
+      });
+
+      inference.mockResolvedValue({
+        model: 'gpt-test',
+        output: 'unknown',
+        costUSD: 0,
       });
 
       const res = await agent

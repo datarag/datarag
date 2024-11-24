@@ -33,6 +33,7 @@
     "func-names": "off",
     "arrow-body-style": "off",
     "no-await-in-loop": "off",
+    "no-bitwise": "off",
     "no-continue": "off"
   }
 }

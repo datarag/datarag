@@ -34,10 +34,16 @@ const MAX_RETRIES = 10;
  * @return {*}
  */
 async function createEmbeddings({ texts, type }) {
+  if (_.isEmpty(texts)) {
+    return {
+      embeddings: [],
+      costUSD: 0,
+    };
+  }
+
   const cohere = new CohereClient(COHERE_CLIENT_CONFIG);
 
   let inputType;
-
   switch (type) {
     case 'document':
       inputType = 'search_document';
@@ -47,13 +53,6 @@ async function createEmbeddings({ texts, type }) {
       break;
     default:
       throw new Error('Invalid embeddings type');
-  }
-
-  if (process.env.NODE_ENV === 'test' || _.isEmpty(texts)) {
-    return {
-      embeddings: _.map(texts, () => _.range(0, 1024)),
-      costUSD: 0,
-    };
   }
 
   let tokens = 0;
@@ -109,14 +108,14 @@ async function createEmbeddings({ texts, type }) {
  * @return {*}
  */
 async function rerank({ query, chunks, threshold }) {
-  const cohere = new CohereClient(COHERE_CLIENT_CONFIG);
-
-  if (process.env.NODE_ENV === 'test' || _.isEmpty(chunks)) {
+  if (_.isEmpty(chunks)) {
     return {
       chunks,
       costUSD: 0,
     };
   }
+
+  const cohere = new CohereClient(COHERE_CLIENT_CONFIG);
 
   let attempt = 0;
   while (attempt < MAX_RETRIES) {
@@ -174,14 +173,6 @@ async function rerank({ query, chunks, threshold }) {
 async function inference({
   text, instructions, creativity, quality, json,
 }) {
-  if (process.env.NODE_ENV === 'test') {
-    return {
-      model: 'gpt-test',
-      output: text,
-      costUSD: 0,
-    };
-  }
-
   const cohere = new CohereClientV2(COHERE_CLIENT_CONFIG);
 
   // Prepare messages
