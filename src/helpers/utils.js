@@ -50,7 +50,7 @@ async function fetchAndCleanHtml(url) {
   const $ = cheerio.load(htmlContent);
 
   // Remove unnecessary elements (adjust selectors as needed)
-  $('nav, .nav, .navigation, header, footer, .footer, aside, script, style, img').remove();
+  $('svg, nav, .nav, .navigation, header, footer, .footer, aside, script, style, img, iframe').remove();
 
   // Remove empty elements
   $('body').find('*').filter(function () {

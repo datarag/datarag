@@ -1,5 +1,6 @@
 const _ = require('lodash');
 const { OpenAI } = require('openai');
+const tiktoken = require('tiktoken');
 const config = require('../config');
 const logger = require('../logger');
 const {
@@ -37,6 +38,18 @@ if (OPENAI_API_KEY) {
   client = new OpenAI({
     apiKey: OPENAI_API_KEY,
   });
+}
+
+const encoding = tiktoken.get_encoding('cl100k_base');
+
+/**
+ * Count OpenAI tokens of next
+ *
+ * @param {*} text
+ * @return {Number}
+ */
+function countTokens(text) {
+  return encoding.encode(text).length;
 }
 
 /**
@@ -82,14 +95,6 @@ async function completionBackoff(payload, models) {
 async function inference({
   text, instructions, creativity, quality, json,
 }) {
-  if (process.env.NODE_ENV === 'test') {
-    return {
-      model: 'gpt-test',
-      output: text,
-      costUSD: 0,
-    };
-  }
-
   if (!client) throw new Error('No OpenAI key is defined');
 
   // Prepare messages
@@ -156,26 +161,30 @@ async function inference({
  * Create a chat request
  *
  * @param {*} {
- *   chatHistory, query, tools, streamFn,
+ *   messages, query, tools, streamFn,
  * }
  * @return {*}
  */
 async function chatStream({
-  chatHistory, query, tools, streamFn,
+  quality, messages, tools, streamFn,
 }) {
-  if (process.env.NODE_ENV === 'test') {
-    return {
-      costUSD: 0,
-      text: query,
-      chatHistory,
-    };
+  if (!client) throw new Error('No OpenAI key is defined');
+
+  let models;
+  switch (quality) {
+    case LLM_QUALITY_HIGH:
+      models = REASONING_MODELS;
+      break;
+    case LLM_QUALITY_MEDIUM:
+    default:
+      models = PROCESSING_MODELS;
+      break;
   }
 
-  const model = _.first(REASONING_MODELS);
+  const model = _.first(models);
 
   let text = '';
-  const messages = [...(chatHistory || [])];
-  messages.push({ role: 'user', content: query });
+  messages = [...messages];
 
   const runner = await client.beta.chat.completions.runTools({
     model,
@@ -186,6 +195,7 @@ async function chatStream({
     },
     tools,
     messages,
+    response_format: { type: 'json_object' },
   }).on('message', (message) => {
     messages.push(message);
   });
@@ -212,6 +222,12 @@ async function chatStream({
     logger.error('chatStream', 'Chunked text with final text are not the same');
   }
 
+  messages = _.filter(messages, (message) => {
+    return message.content && (message.role === 'user'
+      || message.role === 'assistant');
+  });
+  messages = _.map(messages, (message) => _.pick(message, ['role', 'content']));
+
   return {
     model,
     costUSD: res.usage
@@ -219,11 +235,12 @@ async function chatStream({
         + (res.usage.completion_tokens * config.get(`llm:pricing:${model}:output`))
       : 0,
     text,
-    chatHistory: messages,
+    messages,
   };
 }
 
 module.exports = {
   inference,
   chatStream,
+  countTokens,
 };

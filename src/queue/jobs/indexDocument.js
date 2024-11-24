@@ -1,6 +1,5 @@
 /* eslint-disable no-loop-func */
 const _ = require('lodash');
-const tiktoken = require('tiktoken');
 const db = require('../../db/models');
 const logger = require('../../logger');
 const config = require('../../config');
@@ -10,12 +9,7 @@ const { countWords } = require('../../helpers/utils');
 const { chunkifyMarkdown } = require('../../helpers/chunker');
 const { LLM_CREATIVITY_NONE, LLM_QUALITY_MEDIUM } = require('../../constants');
 
-const encoding = tiktoken.get_encoding('cl100k_base');
 const PARALLEL_SIZE = 10;
-
-function countTokens(text) {
-  return encoding.encode(text).length;
-}
 
 /**
  * Summarize
@@ -24,14 +18,6 @@ function countTokens(text) {
  * @return {String}
  */
 async function summarize({ text, maxWords }) {
-  if (process.env.NODE_ENV === 'test') {
-    return {
-      summary: text,
-      context: text,
-      costUSD: 0,
-    };
-  }
-
   const prompt = `
   ## Instructions
 
@@ -93,13 +79,6 @@ ${text}
  * @return {String}
  */
 async function questionBank({ text }) {
-  if (process.env.NODE_ENV === 'test') {
-    return {
-      questions: [],
-      costUSD: 0,
-    };
-  }
-
   const prompt = `
 You are an AI designed to create a knowledge base by generating questions based on the provided document.
 Given the document below, return questions that can be directly answered using the information from the document.
@@ -221,7 +200,7 @@ async function indexDocument(payload) {
       type: 'summary',
       content: summary,
       contentSize: summary.length,
-      contentTokens: countTokens(summary),
+      contentTokens: openai.countTokens(summary),
       embedding: summaryEmbeddings.embeddings[0],
     });
 
@@ -247,7 +226,7 @@ async function indexDocument(payload) {
       type: 'chunk',
       content: chunk,
       contentSize: chunk.length,
-      contentTokens: countTokens(chunk),
+      contentTokens: openai.countTokens(chunk),
       embedding: chunkEmbeddings.embeddings[index],
     })));
 
@@ -277,7 +256,7 @@ async function indexDocument(payload) {
           type: 'question',
           content: question,
           contentSize: question.length,
-          contentTokens: countTokens(question),
+          contentTokens: openai.countTokens(question),
           embedding: qEmbeddings.embeddings[index],
         })));
 

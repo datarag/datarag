@@ -5,9 +5,6 @@ const { SCOPE_CHAT } = require('../src/scopes');
 const openai = require('../src/llms/openai');
 const cohere = require('../src/llms/cohere');
 
-jest.mock('../src/llms/openai');
-jest.mock('../src/llms/cohere');
-
 const TOKEN = 'org_chat_token';
 
 describe('Inference API', () => {
