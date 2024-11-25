@@ -12,7 +12,7 @@ const logger = require('../logger');
 const { serializeDocument } = require('../helpers/serialize');
 const { TreeNode } = require('../helpers/treenode');
 
-const RERANK_THRESHOLD = config.get('retrieval:rerank:threshold');
+const RERANK_CUTOFF_BIAS = config.get('retrieval:rerank:cutoff:bias');
 const { Op } = db.Sequelize;
 
 /**
@@ -348,7 +348,7 @@ async function retrieveChunks({
   const rerankRagLog = retrieveRagLog.addChild(new TreeNode({
     type: 'rerank',
     query,
-    threshold: RERANK_THRESHOLD,
+    cutoff_bias: RERANK_CUTOFF_BIAS,
     input_chunk_count: chunks.length,
   }));
   rerankRagLog.startMeasure();
@@ -356,7 +356,7 @@ async function retrieveChunks({
   const rerankResponse = await rerank({
     query,
     chunks,
-    threshold: RERANK_THRESHOLD,
+    bias: RERANK_CUTOFF_BIAS,
   });
   costUSD += rerankResponse.costUSD;
   chunks = rerankResponse.chunks;

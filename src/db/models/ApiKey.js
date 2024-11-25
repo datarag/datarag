@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       ApiKey.hasMany(models.AuditLog);
       ApiKey.hasMany(models.RagLog);
       ApiKey.hasMany(models.CostLog);
+      ApiKey.hasMany(models.Conversation);
     }
   }
   ApiKey.init({

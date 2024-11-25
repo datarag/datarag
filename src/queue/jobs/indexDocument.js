@@ -139,6 +139,16 @@ ${text}
 }
 
 /**
+ * Count tokens of text
+ *
+ * @param {String} text
+ * @return {Number}
+ */
+function countTokens(text) {
+  return openai.textToTokens(text).length;
+}
+
+/**
  * Worker function for indexing documents
  *
  * @param {*} payload
@@ -200,7 +210,7 @@ async function indexDocument(payload) {
       type: 'summary',
       content: summary,
       contentSize: summary.length,
-      contentTokens: openai.countTokens(summary),
+      contentTokens: countTokens(summary),
       embedding: summaryEmbeddings.embeddings[0],
     });
 
@@ -226,7 +236,7 @@ async function indexDocument(payload) {
       type: 'chunk',
       content: chunk,
       contentSize: chunk.length,
-      contentTokens: openai.countTokens(chunk),
+      contentTokens: countTokens(chunk),
       embedding: chunkEmbeddings.embeddings[index],
     })));
 
@@ -256,7 +266,7 @@ async function indexDocument(payload) {
           type: 'question',
           content: question,
           contentSize: question.length,
-          contentTokens: openai.countTokens(question),
+          contentTokens: countTokens(question),
           embedding: qEmbeddings.embeddings[index],
         })));
 

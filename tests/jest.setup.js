@@ -38,8 +38,12 @@ jest.mock('../src/llms/openai', () => ({
     };
   }),
 
-  countTokens: jest.fn((text) => {
-    return (text || '').length;
+  textToTokens: jest.fn((text) => {
+    return (text || '').split(' ');
+  }),
+
+  tokensToText: jest.fn((tokens) => {
+    return (tokens || []).join(' ');
   }),
 
   chatStream: jest.fn(async ({ messages }) => {
