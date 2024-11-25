@@ -40,16 +40,26 @@ if (OPENAI_API_KEY) {
   });
 }
 
-const encoding = tiktoken.get_encoding('cl100k_base');
+const tokenizer = tiktoken.get_encoding('cl100k_base');
 
 /**
- * Count OpenAI tokens of next
+ * Text to tokens
  *
  * @param {*} text
  * @return {Number}
  */
-function countTokens(text) {
-  return encoding.encode(text).length;
+function textToTokens(text) {
+  return tokenizer.encode(text);
+}
+
+/**
+ * Text to tokens
+ *
+ * @param {*} text
+ * @return {Number}
+ */
+function tokensToText(tokens) {
+  return new TextDecoder().decode(tokenizer.decode(tokens));
 }
 
 /**
@@ -184,8 +194,6 @@ async function chatStream({
   const model = _.first(models);
 
   let text = '';
-  messages = [...messages];
-
   const runner = await client.beta.chat.completions.runTools({
     model,
     temperature: 0.1,
@@ -196,8 +204,6 @@ async function chatStream({
     tools,
     messages,
     response_format: { type: 'json_object' },
-  }).on('message', (message) => {
-    messages.push(message);
   });
 
   for await (const chunk of runner) {
@@ -222,25 +228,19 @@ async function chatStream({
     logger.error('chatStream', 'Chunked text with final text are not the same');
   }
 
-  messages = _.filter(messages, (message) => {
-    return message.content && (message.role === 'user'
-      || message.role === 'assistant');
-  });
-  messages = _.map(messages, (message) => _.pick(message, ['role', 'content']));
-
   return {
     model,
+    text,
     costUSD: res.usage
       ? (res.usage.prompt_tokens * config.get(`llm:pricing:${model}:input`))
         + (res.usage.completion_tokens * config.get(`llm:pricing:${model}:output`))
       : 0,
-    text,
-    messages,
   };
 }
 
 module.exports = {
   inference,
   chatStream,
-  countTokens,
+  textToTokens,
+  tokensToText,
 };

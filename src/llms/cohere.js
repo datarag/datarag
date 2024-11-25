@@ -3,7 +3,7 @@ const _ = require('lodash');
 const { CohereClient, CohereClientV2 } = require('cohere-ai');
 const config = require('../config');
 const logger = require('../logger');
-const { findMedian } = require('../helpers/utils');
+const { findAverage } = require('../helpers/utils');
 const {
   LLM_CREATIVITY_HIGH,
   LLM_CREATIVITY_MEDIUM,
@@ -104,10 +104,10 @@ async function createEmbeddings({ texts, type }) {
 /**
  * Perform reranking on a set of chunks
  *
- * @param {*} { query, chunks, threshold }
+ * @param {*} { query, chunks, bias }
  * @return {*}
  */
-async function rerank({ query, chunks, threshold }) {
+async function rerank({ query, chunks, bias }) {
   if (_.isEmpty(chunks)) {
     return {
       chunks,
@@ -130,7 +130,7 @@ async function rerank({ query, chunks, threshold }) {
         model: COHERE_RERANK_MODEL,
       }, COHERE_CLIENT_REQUEST_OPTIONS);
 
-      const median = findMedian(_.map(rerankResponse.results, (result) => result.relevanceScore));
+      const average = findAverage(_.map(rerankResponse.results, (result) => result.relevanceScore));
 
       const filteredChunks = [];
       const sortedChunks = [];
@@ -138,7 +138,7 @@ async function rerank({ query, chunks, threshold }) {
         const chunk = chunks[result.index];
         chunk.score = result.relevanceScore;
         sortedChunks.push(chunk);
-        if (result.relevanceScore >= (threshold * median)) {
+        if (result.relevanceScore >= (bias * average)) {
           filteredChunks.push(chunk);
         }
       });

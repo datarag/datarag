@@ -2,9 +2,9 @@ const _ = require('lodash');
 const pgvector = require('pgvector/utils');
 const db = require('../db/models');
 const config = require('../config');
-const { findMedian } = require('../helpers/utils');
+const { findAverage } = require('../helpers/utils');
 
-const THRESHOLD = config.get('retrieval:embeddings:threshold');
+const CUTOFF_BIAS = config.get('retrieval:embeddings:cutoff:bias');
 
 /**
  * Perform semantic search on database
@@ -46,8 +46,8 @@ async function semanticSearch({
 
   let chunks = [];
   if (!_.isEmpty(similarities)) {
-    // Find median
-    const median = findMedian(_.map(similarities, (row) => row.similarity));
+    // Find average
+    const average = findAverage(_.map(similarities, (row) => row.similarity));
     // Query chunks
     chunks = await db.sequelize.query(`
       SELECT *,
@@ -57,7 +57,7 @@ async function semanticSearch({
         ${filter}
         "OrganizationId" = :orgid AND
         "DatasourceId" IN (:dsids) AND
-        (1 - ("embedding" <=> :vector)) >= ${THRESHOLD * median}
+        (1 - ("embedding" <=> :vector)) >= ${CUTOFF_BIAS * average}
       ORDER BY similarity DESC
       LIMIT ${limit || 1000} OFFSET ${offset || 0};
     `, {

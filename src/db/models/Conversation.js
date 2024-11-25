@@ -5,10 +5,12 @@ module.exports = (sequelize, DataTypes) => {
     // eslint-disable-next-line no-unused-vars
     static associate(models) {
       Conversation.belongsTo(models.Organization);
+      Conversation.belongsTo(models.ApiKey);
     }
   }
   Conversation.init({
     OrganizationId: DataTypes.BIGINT,
+    ApiKeyId: DataTypes.BIGINT,
     resId: DataTypes.STRING,
     history: DataTypes.JSONB,
     createdAt: DataTypes.DATE,

@@ -157,6 +157,19 @@ function findMedian(arr) {
   return (mid1 + mid2) / 2;
 }
 
+/**
+ * Find the average of an array of numbers
+ *
+ * @param {[Number]} arr
+ * @return {Number}
+ */
+function findAverage(arr) {
+  if (arr.length === 0) return 0;
+  const sum = arr.reduce((acc, val) => acc + val, 0);
+  const average = sum / arr.length;
+  return average;
+}
+
 module.exports = {
   isSafeUrl,
   fetchAndCleanHtml,
@@ -166,4 +179,5 @@ module.exports = {
   convertToFunctionName,
   nameFunction,
   findMedian,
+  findAverage,
 };
