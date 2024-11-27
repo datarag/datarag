@@ -46,10 +46,11 @@ nconf.set('queue:workers', getEnvironment('DATARAG_QUEUE_WORKERS', 2));
 
 nconf.set('api:payload:maxsize', getEnvironment('DATARAG_API_PAYLOAD_MAXSIZE', '50mb'));
 
-nconf.set('retrieval:embeddings:cutoff:bias', getEnvironment('DATARAG_RETRIEVAL_EMBEDDINGS_CUTOFF_BIAS', 1));
-nconf.set('retrieval:rerank:cutoff:bias', getEnvironment('DATARAG_RETRIEVAL_RERANK_CUTOFF_BIAS', 0.2));
+nconf.set('retrieval:embeddings:cutoff', getEnvironment('DATARAG_RETRIEVAL_EMBEDDINGS_CUTOFF', 0.5));
+nconf.set('retrieval:rerank:cutoff', getEnvironment('DATARAG_RETRIEVAL_RERANK_CUTOFF', 0.5));
 nconf.set('chat:turns:maxtokens', getEnvironment('DATARAG_CHAT_TURNS_MAXTOKENS', 4096));
-nconf.set('chat:instructions:maxtokens', getEnvironment('DATARAG_CHAT_INSTRUCTIONS_MAXTOKENS', 16384));
+nconf.set('chat:instructions:maxtokens', getEnvironment('DATARAG_CHAT_INSTRUCTIONS_MAXTOKENS', 2048));
+nconf.set('chat:custom:context:maxtokens', getEnvironment('DATARAG_CHAT_CUSTOM_CONTEXT_MAXTOKENS', 16384));
 
 // Logs
 nconf.set('auditlog:enabled', getEnvironment('DATARAG_AUDITLOG_ENABLED', true));

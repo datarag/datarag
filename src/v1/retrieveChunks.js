@@ -167,7 +167,6 @@ module.exports = (router) => {
       const ragLog = new TreeNode({
         type: 'retrieve_chunks',
         timestamp: now,
-        request: payload,
       });
       ragLog.startMeasure();
       req.ragLog = ragLog;

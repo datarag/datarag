@@ -194,17 +194,31 @@ async function chatStream({
   const model = _.first(models);
 
   let text = '';
-  const runner = await client.beta.chat.completions.runTools({
-    model,
-    temperature: 0.1,
-    stream: true,
-    stream_options: {
-      include_usage: true,
-    },
-    tools,
-    messages,
-    response_format: { type: 'json_object' },
-  });
+  let runner;
+  if (!_.isEmpty(tools)) {
+    runner = await client.beta.chat.completions.runTools({
+      model,
+      temperature: 0.2,
+      stream: true,
+      stream_options: {
+        include_usage: true,
+      },
+      tools,
+      messages,
+      response_format: { type: 'json_object' },
+    });
+  } else {
+    runner = await client.beta.chat.completions.stream({
+      model,
+      temperature: 0.2,
+      stream: true,
+      stream_options: {
+        include_usage: true,
+      },
+      messages,
+      response_format: { type: 'json_object' },
+    });
+  }
 
   for await (const chunk of runner) {
     if (chunk.choices[0]

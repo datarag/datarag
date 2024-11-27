@@ -142,7 +142,6 @@ module.exports = (router) => {
       const ragLog = new TreeNode({
         type: 'retrieve_documents',
         timestamp: now,
-        request: payload,
       });
       ragLog.startMeasure();
       req.ragLog = ragLog;

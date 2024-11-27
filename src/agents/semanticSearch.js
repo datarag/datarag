@@ -2,9 +2,8 @@ const _ = require('lodash');
 const pgvector = require('pgvector/utils');
 const db = require('../db/models');
 const config = require('../config');
-const { findAverage } = require('../helpers/utils');
 
-const CUTOFF_BIAS = config.get('retrieval:embeddings:cutoff:bias');
+const CUTOFF = config.get('retrieval:embeddings:cutoff');
 
 /**
  * Perform semantic search on database
@@ -25,50 +24,25 @@ async function semanticSearch({
     ? `"type" = '${type}' AND `
     : '';
 
-  const similarities = await db.sequelize.query(`
-    SELECT (1 - ("embedding" <=> :vector)) as similarity
+  const chunks = await db.sequelize.query(`
+    SELECT *,
+      (1 - ("embedding" <=> :vector)) as similarity
     FROM "${db.Chunk.tableName}"
     WHERE
       ${filter}
       "OrganizationId" = :orgid AND
       "DatasourceId" IN (:dsids) AND
-      (1 - ("embedding" <=> :vector)) > 0
+      (1 - ("embedding" <=> :vector)) >= ${CUTOFF}
     ORDER BY similarity DESC
-    LIMIT 100;
+    LIMIT ${limit || 1000} OFFSET ${offset || 0};
   `, {
-    type: db.sequelize.QueryTypes.SELECT,
+    model: db.Chunk,
     replacements: {
       orgid: organizationId,
       dsids: datasourceIds,
       vector: pgvector.toSql(queryVector),
     },
   });
-
-  let chunks = [];
-  if (!_.isEmpty(similarities)) {
-    // Find average
-    const average = findAverage(_.map(similarities, (row) => row.similarity));
-    // Query chunks
-    chunks = await db.sequelize.query(`
-      SELECT *,
-        (1 - ("embedding" <=> :vector)) as similarity
-      FROM "${db.Chunk.tableName}"
-      WHERE
-        ${filter}
-        "OrganizationId" = :orgid AND
-        "DatasourceId" IN (:dsids) AND
-        (1 - ("embedding" <=> :vector)) >= ${CUTOFF_BIAS * average}
-      ORDER BY similarity DESC
-      LIMIT ${limit || 1000} OFFSET ${offset || 0};
-    `, {
-      model: db.Chunk,
-      replacements: {
-        orgid: organizationId,
-        dsids: datasourceIds,
-        vector: pgvector.toSql(queryVector),
-      },
-    });
-  }
 
   return {
     costUSD: 0,

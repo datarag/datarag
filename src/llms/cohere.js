@@ -3,7 +3,6 @@ const _ = require('lodash');
 const { CohereClient, CohereClientV2 } = require('cohere-ai');
 const config = require('../config');
 const logger = require('../logger');
-const { findAverage } = require('../helpers/utils');
 const {
   LLM_CREATIVITY_HIGH,
   LLM_CREATIVITY_MEDIUM,
@@ -107,7 +106,7 @@ async function createEmbeddings({ texts, type }) {
  * @param {*} { query, chunks, bias }
  * @return {*}
  */
-async function rerank({ query, chunks, bias }) {
+async function rerank({ query, chunks, cutoff }) {
   if (_.isEmpty(chunks)) {
     return {
       chunks,
@@ -130,15 +129,13 @@ async function rerank({ query, chunks, bias }) {
         model: COHERE_RERANK_MODEL,
       }, COHERE_CLIENT_REQUEST_OPTIONS);
 
-      const average = findAverage(_.map(rerankResponse.results, (result) => result.relevanceScore));
-
       const filteredChunks = [];
       const sortedChunks = [];
       _.each(rerankResponse.results, (result) => {
         const chunk = chunks[result.index];
         chunk.score = result.relevanceScore;
         sortedChunks.push(chunk);
-        if (result.relevanceScore >= (bias * average)) {
+        if (result.relevanceScore >= cutoff) {
           filteredChunks.push(chunk);
         }
       });
