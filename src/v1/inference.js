@@ -162,7 +162,6 @@ module.exports = (router) => {
       const ragLog = new TreeNode({
         type: 'inference',
         timestamp: now,
-        request: payload,
       });
       ragLog.startMeasure();
       req.ragLog = ragLog;

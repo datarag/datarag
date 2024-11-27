@@ -74,7 +74,7 @@ describe('Chat API', () => {
 
       inference.mockResolvedValue({
         model: 'gpt-test',
-        output: 'unknown',
+        output: { classification: 'unknown' },
         costUSD: 0,
       });
 
