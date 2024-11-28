@@ -1,6 +1,6 @@
 const _ = require('lodash');
 const { OpenAI } = require('openai');
-const tiktoken = require('tiktoken');
+const { getEncoding } = require('js-tiktoken');
 const config = require('../config');
 const logger = require('../logger');
 const {
@@ -40,7 +40,7 @@ if (OPENAI_API_KEY) {
   });
 }
 
-const tokenizer = tiktoken.get_encoding('cl100k_base');
+const tokenizer = getEncoding('cl100k_base');
 
 /**
  * Text to tokens
@@ -59,7 +59,7 @@ function textToTokens(text) {
  * @return {Number}
  */
 function tokensToText(tokens) {
-  return new TextDecoder().decode(tokenizer.decode(tokens));
+  return tokenizer.decode(tokens);
 }
 
 /**
