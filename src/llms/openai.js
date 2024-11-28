@@ -46,20 +46,28 @@ const tokenizer = getEncoding('cl100k_base');
  * Text to tokens
  *
  * @param {*} text
- * @return {Number}
+ * @return {[]}
  */
 function textToTokens(text) {
-  return tokenizer.encode(text);
+  try {
+    return tokenizer.encode(text);
+  } catch (err) {
+    return [];
+  }
 }
 
 /**
- * Text to tokens
+ * Tokens to text
  *
- * @param {*} text
- * @return {Number}
+ * @param {[]} tokens
+ * @return {String}
  */
 function tokensToText(tokens) {
-  return tokenizer.decode(tokens);
+  try {
+    return tokenizer.decode(tokens);
+  } catch (err) {
+    return '';
+  }
 }
 
 /**
