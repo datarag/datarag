@@ -12,6 +12,7 @@ module.exports = (sequelize, DataTypes) => {
     OrganizationId: DataTypes.BIGINT,
     ApiKeyId: DataTypes.BIGINT,
     resId: DataTypes.STRING,
+    title: DataTypes.STRING,
     history: DataTypes.JSONB,
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,

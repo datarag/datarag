@@ -51,6 +51,7 @@ nconf.set('retrieval:rerank:cutoff', getEnvironment('DATARAG_RETRIEVAL_RERANK_CU
 nconf.set('chat:turns:maxtokens', getEnvironment('DATARAG_CHAT_TURNS_MAXTOKENS', 4096));
 nconf.set('chat:instructions:maxtokens', getEnvironment('DATARAG_CHAT_INSTRUCTIONS_MAXTOKENS', 2048));
 nconf.set('chat:custom:context:maxtokens', getEnvironment('DATARAG_CHAT_CUSTOM_CONTEXT_MAXTOKENS', 16384));
+nconf.set('chat:max:conversations', getEnvironment('DATARAG_CHAT_MAX_CONVERSATIONS', 100));
 
 // Logs
 nconf.set('auditlog:enabled', getEnvironment('DATARAG_AUDITLOG_ENABLED', true));

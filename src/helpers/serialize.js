@@ -66,9 +66,24 @@ function serializeConnector(model) {
   };
 }
 
+/**
+ * Serialize conversation
+ *
+ * @param {*} model
+ * @return {*}
+ */
+function serializeConversation(model) {
+  return {
+    id: model.resId,
+    title: model.title,
+    date: model.updatedAt.toISOString(),
+  };
+}
+
 module.exports = {
   serializeDatasource,
   serializeAgent,
   serializeDocument,
   serializeConnector,
+  serializeConversation,
 };

@@ -109,5 +109,6 @@ require('./retrieveQuestions')(router);
 require('./chat')(router);
 require('./inference')(router);
 require('./reports')(router);
+require('./conversations')(router);
 
 module.exports = router;
