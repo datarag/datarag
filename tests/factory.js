@@ -85,6 +85,27 @@ async function setupOrg(name) {
     metadata: { foo: 'bar' },
   });
 
+  const conversation = await db.Conversation.create({
+    OrganizationId: organization.id,
+    ApiKeyId: apiKey.id,
+    resId: name,
+    title: name,
+    history: {
+      provider: 'gpt',
+      turns: [{
+        response: {
+          data: {
+            message: name,
+          },
+          meta: {
+            transaction_id: name,
+          },
+        },
+        user_rating: 0,
+      }],
+    },
+  });
+
   return {
     organization,
     apiKey,
@@ -93,6 +114,7 @@ async function setupOrg(name) {
     agentDatasource,
     document,
     connector,
+    conversation,
   };
 }
 

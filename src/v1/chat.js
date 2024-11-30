@@ -17,14 +17,22 @@ const {
 } = require('../llms/openai');
 const { TreeNode } = require('../helpers/treenode');
 const { SCOPE_CHAT } = require('../scopes');
-const { LLM_CREATIVITY_NONE, LLM_QUALITY_MEDIUM, LLM_QUALITY_HIGH } = require('../constants');
+const {
+  LLM_CREATIVITY_NONE,
+  LLM_QUALITY_MEDIUM,
+  LLM_QUALITY_HIGH,
+  LLM_CREATIVITY_HIGH,
+} = require('../constants');
 const classifyQueryPrompt = require('../prompts/classifyQueryPrompt');
 const chatPrompt = require('../prompts/chatPrompt');
 const repurposeQueryPrompt = require('../prompts/repurposeQueryPrompt');
+const conversationTitlePrompt = require('../prompts/conversationTitlePrompt');
 
+const { Op } = db.Sequelize;
 const TURN_MAXTOKENS = config.get('chat:turns:maxtokens');
 const INSTRUCTIONS_MAXTOKENS = config.get('chat:instructions:maxtokens');
 const CUSTOM_CONTEXT_MAXTOKENS = config.get('chat:custom:context:maxtokens');
+const MAX_CONVERSATIONS = config.get('chat:max:conversations');
 
 /**
  * Extract the "response" property from a partial build JSON
@@ -786,7 +794,24 @@ module.exports = (router) => {
         },
       };
 
-      // Add turn to conversation
+      ragLog.appendData({
+        response: finalResponse,
+      });
+      ragLog.endMeasure();
+
+      req.transactionAction = 'chat';
+      req.transactionCostUSD = queryCostUSD;
+
+      if (!payload.stream) {
+        res.json(finalResponse);
+      } else {
+        res.write(`data: ${JSON.stringify(finalResponse)}\n\n`);
+        res.flush();
+        res.end();
+      }
+
+      // -------- Add to conversation --------
+
       await conversation.update({
         history: {
           ...conversation.history,
@@ -804,20 +829,46 @@ module.exports = (router) => {
         },
       });
 
-      ragLog.appendData({
-        response: finalResponse,
-      });
-      ragLog.endMeasure();
+      // -------- Create title --------
 
-      req.transactionAction = 'chat';
-      req.transactionCostUSD = queryCostUSD;
+      if (!conversation.title) {
+        try {
+          const titleResponse = await inference({
+            text: conversationTitlePrompt({ query: payload.query }).prompt,
+            creativity: LLM_CREATIVITY_HIGH,
+            quality: LLM_QUALITY_MEDIUM,
+            json: true,
+          });
+          await conversation.update({
+            title: titleResponse.output.title || 'Unnamed',
+          });
+        } catch (err) {
+          // no-op
+        }
+      }
 
-      if (!payload.stream) {
-        res.json(finalResponse);
-      } else {
-        res.write(`data: ${JSON.stringify(finalResponse)}\n\n`);
-        res.flush();
-        res.end();
+      // -------- Delete history --------
+
+      const idsToDelete = await db.Conversation.findAll({
+        where: {
+          OrganizationId: req.organization.id,
+          ApiKeyId: req.apiKey.id,
+        },
+        attributes: ['id'],
+        order: [['updatedAt', 'DESC']],
+        offset: MAX_CONVERSATIONS,
+        raw: true,
+      }).then((records) => records.map((record) => record.id));
+
+      if (idsToDelete.length > 0) {
+        log(`Deleting ${idsToDelete.length} past conversations`);
+        await db.Conversation.destroy({
+          where: {
+            id: {
+              [Op.in]: idsToDelete,
+            },
+          },
+        });
       }
     }),
   );
