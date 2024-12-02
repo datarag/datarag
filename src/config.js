@@ -50,7 +50,7 @@ nconf.set('retrieval:embeddings:cutoff', getEnvironment('DATARAG_RETRIEVAL_EMBED
 nconf.set('retrieval:rerank:cutoff', getEnvironment('DATARAG_RETRIEVAL_RERANK_CUTOFF', 0.5));
 nconf.set('chat:turns:maxtokens', getEnvironment('DATARAG_CHAT_TURNS_MAXTOKENS', 4096));
 nconf.set('chat:instructions:maxtokens', getEnvironment('DATARAG_CHAT_INSTRUCTIONS_MAXTOKENS', 2048));
-nconf.set('chat:custom:context:maxtokens', getEnvironment('DATARAG_CHAT_CUSTOM_CONTEXT_MAXTOKENS', 16384));
+nconf.set('chat:turn:context:maxtokens', getEnvironment('DATARAG_CHAT_TURN_CONTEXT_MAXTOKENS', 16384));
 nconf.set('chat:max:conversations', getEnvironment('DATARAG_CHAT_MAX_CONVERSATIONS', 100));
 
 // Logs
