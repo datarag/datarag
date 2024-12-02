@@ -31,7 +31,7 @@ const conversationTitlePrompt = require('../prompts/conversationTitlePrompt');
 const { Op } = db.Sequelize;
 const TURN_MAXTOKENS = config.get('chat:turns:maxtokens');
 const INSTRUCTIONS_MAXTOKENS = config.get('chat:instructions:maxtokens');
-const CUSTOM_CONTEXT_MAXTOKENS = config.get('chat:custom:context:maxtokens');
+const TURN_CONTEXT_MAXTOKENS = config.get('chat:turn:context:maxtokens');
 const MAX_CONVERSATIONS = config.get('chat:max:conversations');
 
 /**
@@ -255,10 +255,6 @@ module.exports = (router) => {
   *           enum: [question, task, unknown]
   *           example: question
   *           description: Classification of the user query.
-  *         answered:
-  *           type: boolean
-  *           example: true
-  *           description: If chat was able to answer the user query.
   *         confidence:
   *           type: integer
   *           example: 4
@@ -298,9 +294,9 @@ module.exports = (router) => {
   *             maxLength: 255
   *             example: 'website-agent'
   *           description: An array of datasource ids to be used in RAG.
-  *         custom_context:
+  *         turn_context:
   *           type: array
-  *           description: Additional custom knowledge context to be used.
+  *           description: Additional custom knowledge context to be used in this turn.
   *           items:
   *             type: object
   *             properties:
@@ -310,6 +306,9 @@ module.exports = (router) => {
   *                 description: Text context
   *               metadata:
   *                 type: object
+  *         turn_metadata:
+  *           type: object
+  *           description: Turn metadata object to be stored in conversation turn history.
   *         query:
   *           type: string
   *           example: 'What is machine learning?'
@@ -406,18 +405,6 @@ module.exports = (router) => {
   *                        type: string
   *                        description: A transaction identifier.
   *                        example: fhxJfds-1jv
-  *                     datasource_ids:
-  *                        type: array
-  *                        description: |
-  *                          A list of datasource ids that where available
-  *                          during knowledge retrieval.
-  *                        items:
-  *                          type: string
-  *                          example: 'help-center'
-  *                     used_custom_context:
-  *                       type: boolean
-  *                       example: true
-  *                       description: If custom context was used.
   *       '400':
   *         description: Bad request
   *         content:
@@ -445,7 +432,6 @@ module.exports = (router) => {
       let conversation = null;
       let classification = 'other';
       const sources = [];
-      let answered = false;
       let confidence = 0;
       let finalText = '';
       let model = '';
@@ -671,10 +657,10 @@ module.exports = (router) => {
           const knowledge = [];
 
           // Add custom knowledge
-          if (!_.isEmpty(payload.custom_context)) {
+          if (!_.isEmpty(payload.turn_context)) {
             // Limit budgets
-            let maxTokens = CUSTOM_CONTEXT_MAXTOKENS;
-            _.each(payload.custom_context, (context) => {
+            let maxTokens = TURN_CONTEXT_MAXTOKENS;
+            _.each(payload.turn_context, (context) => {
               if (!context.text) return;
               // Text
               const truncatedText = truncateToTokens(context.text, maxTokens);
@@ -690,16 +676,17 @@ module.exports = (router) => {
                 metadata = {};
               }
               knowledge.push({
+                id: nanoid(),
                 text,
                 metadata,
+                datasource_id: '',
+                document_id: '',
               });
             });
           }
 
           if (!payload.query || _.isEmpty(searchDataSourceIds)) {
-            return {
-              knowledge,
-            };
+            return knowledge;
           }
 
           const repurposeResponse = await inference({
@@ -726,30 +713,37 @@ module.exports = (router) => {
           queryCostUSD += costUSD;
           logger.debug('datasource:response', `${chunks.length} retrieved`);
           log(`Searching knowledge base yield ${chunks.length} chunks`);
-          // Add to sources
-          _.each(chunks, (chunk) => {
-            sources.push(_.pick(chunk, ['datasource_id', 'document_id']));
-          });
           // Add to knowledge
           _.each(chunks, (chunk) => {
             knowledge.push({
+              id: nanoid(),
               text: chunk.text,
               metadata: chunk.metadata || {},
+              datasource_id: chunk.datasource_id,
+              document_id: chunk.document_id,
             });
           });
-          return {
-            knowledge,
-          };
+          return knowledge;
         };
 
         // --------------- Messages ---------------
+
+        const knowledgeBase = await retrieveFromKnowledgeBase();
+        const knowledgeIdToSource = {};
+        const knowledgeToPrompt = [];
+        _.each(knowledgeBase, (entry) => {
+          knowledgeToPrompt.push(_.pick(entry, ['id', 'text', 'chunk']));
+          knowledgeIdToSource[entry.id] = _.pick(entry, ['datasource_id', 'document_id']);
+        });
 
         const chatResponse = await chatStream({
           quality: classification === 'task' ? LLM_QUALITY_HIGH : LLM_QUALITY_MEDIUM,
           messages: createMessages(
             req.organization,
             conversation,
-            await retrieveFromKnowledgeBase(),
+            {
+              knowledge: _.map(knowledgeBase, (entry) => _.pick(entry, ['id', 'text', 'chunk'])),
+            },
             payload,
           ),
           tools,
@@ -763,8 +757,16 @@ module.exports = (router) => {
         try {
           const jsonResponse = JSON.parse(chatResponse.text);
           finalText = jsonResponse.response || finalText;
-          answered = !!(jsonResponse.answered);
-          confidence = jsonResponse.confidence | 0;
+          // Find sources used to answer question
+          _.each(jsonResponse.citations, (citationId) => {
+            if (knowledgeIdToSource[citationId]) {
+              sources.push(knowledgeIdToSource[citationId]);
+            }
+          });
+          // Generate confidence level
+          if (knowledgeBase.length > 0) {
+            confidence = Math.ceil((jsonResponse.citations.length * 5) / knowledgeBase.length);
+          }
         } catch (err) {
           // no-op
         }
@@ -780,17 +782,17 @@ module.exports = (router) => {
           conversation_id: conversation.resId,
           finished: true,
           classification,
-          answered,
           confidence,
-          sources: _.uniqWith(sources, _.isEqual),
+          sources: _.uniqWith(
+            _.filter(sources, (source) => !!(source.datasource_id && source.document_id)),
+            _.isEqual,
+          ),
         },
         meta: {
           model,
           query: payload.query,
-          datasource_ids: datasourceIds,
           processing_time_ms: Date.now() - now,
           transaction_id: req.transactionId,
-          used_custom_context: !_.isEmpty(payload.custom_context),
         },
       };
 
@@ -820,7 +822,7 @@ module.exports = (router) => {
             {
               response: finalResponse,
               timestamp: Date.now(),
-              user_rating: 0,
+              metadata: payload.turn_metadata || {},
               tokens:
                 textToTokens(finalResponse.data.message).length
                 + textToTokens(finalResponse.meta.query).length,

@@ -101,7 +101,6 @@ async function setupOrg(name) {
             transaction_id: name,
           },
         },
-        user_rating: 0,
       }],
     },
   });
