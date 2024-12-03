@@ -22,14 +22,17 @@ const {
   LLM_QUALITY_MEDIUM,
   LLM_QUALITY_HIGH,
   LLM_CREATIVITY_HIGH,
+  LLM_CREATIVITY_MEDIUM,
 } = require('../constants');
 const classifyQueryPrompt = require('../prompts/classifyQueryPrompt');
 const chatPrompt = require('../prompts/chatPrompt');
-const repurposeQueryPrompt = require('../prompts/repurposeQueryPrompt');
 const conversationTitlePrompt = require('../prompts/conversationTitlePrompt');
+const repurposeQueryPrompt = require('../prompts/repurposeQueryPrompt');
+const chatInstructions = require('../prompts/chatInstructions');
 
 const { Op } = db.Sequelize;
-const TURN_MAXTOKENS = config.get('chat:turns:maxtokens');
+const REPURPOSE_MAXTOKENS = config.get('chat:repurpose:maxtokens');
+const HISTORY_MAXTOKENS = config.get('chat:history:maxtokens');
 const INSTRUCTIONS_MAXTOKENS = config.get('chat:instructions:maxtokens');
 const TURN_CONTEXT_MAXTOKENS = config.get('chat:turn:context:maxtokens');
 const MAX_CONVERSATIONS = config.get('chat:max:conversations');
@@ -160,67 +163,6 @@ async function getOrCreateConversation(organization, apiKey, provider, payload) 
   });
 
   return conversation;
-}
-
-/**
- * Create message history
- *
- * @param {*} organization
- * @param {*} conversation
- * @param {*} payload
- * @return {*}
- */
-function createMessages(organization, conversation, knowledgeJSON, payload) {
-  const messages = [];
-
-  // Add user query
-  messages.unshift({
-    role: 'user',
-    content: payload.query,
-  });
-
-  // Add instructions
-  messages.unshift({
-    role: 'system',
-    content: chatPrompt({
-      instructions: getInstructions(organization, payload),
-      cannedResponse: getCannedResponse(),
-      knowledgeJSON,
-    }).prompt,
-  });
-
-  // Add previous turns
-  let turnTokens = 0;
-  _.each(_.reverse(conversation.history.turns), (turn) => {
-    if (turnTokens >= TURN_MAXTOKENS) return;
-    turnTokens += turn.tokens;
-    messages.unshift({ role: 'assistant', content: turn.response.data.message });
-    messages.unshift({ role: 'user', content: turn.response.meta.query });
-  });
-
-  return messages;
-}
-
-/**
- * Create user query history
- *
- * @param {*} organization
- * @param {*} conversation
- * @param {*} payload
- * @return {*}
- */
-function getQueryHistory(organization, conversation) {
-  const messages = [];
-
-  // Add previous turns
-  let turnTokens = 0;
-  _.each(_.reverse(conversation.history.turns), (turn) => {
-    if (turnTokens >= TURN_MAXTOKENS) return;
-    turnTokens += turn.tokens;
-    messages.unshift(turn.response.meta.query);
-  });
-
-  return messages.join('\n');
 }
 
 module.exports = (router) => {
@@ -397,6 +339,10 @@ module.exports = (router) => {
   *                        type: string
   *                        description: The initial requested query.
   *                        example: 'What is machine learning?'
+  *                     repurposed_query:
+  *                        type: string
+  *                        description: Repurposed query using conversation history as context.
+  *                        example: 'What is machine learning the Generative space?'
   *                     model:
   *                        type: string
   *                        description: The LLM model used for inference.
@@ -427,6 +373,7 @@ module.exports = (router) => {
       const cannedResponse = getCannedResponse();
       const payload = req.body.data;
       let queryCostUSD = 0;
+      let repurposedQuery = payload.query;
 
       let datasourceIds = [];
       let conversation = null;
@@ -456,36 +403,69 @@ module.exports = (router) => {
       ragLog.startMeasure();
       req.ragLog = ragLog;
 
-      await Promise.all([
-        // --------------- Datasources ---------------
-        (async () => {
-          datasourceIds = await findDatasourceIds({
-            organization: req.organization,
-            agentResId: payload.agent_id,
-            datasourceResIds: payload.datasource_ids,
+      // --------------- Conversation history ---------------
+
+      conversation = await getOrCreateConversation(
+        req.organization,
+        req.apiKey,
+        provider,
+        payload,
+      );
+
+      // --------------- Reformulate query ---------------
+
+      await (async () => {
+        if (_.isEmpty(conversation.history.turns)) return;
+
+        const history = [];
+
+        // Add previous turns
+        let turnTokens = 0;
+        _.each(_.reverse(conversation.history.turns), (turn) => {
+          if (turnTokens >= REPURPOSE_MAXTOKENS) return;
+          turnTokens += turn.tokens;
+          history.unshift({
+            user: turn.response.meta.query,
+            assistant: turn.response.data.message,
           });
-        })(),
-        // --------------- Conversation history ---------------
-        (async () => {
-          conversation = await getOrCreateConversation(
-            req.organization,
-            req.apiKey,
-            provider,
-            payload,
-          );
-        })(),
-        // --------------- Query classification ---------------
-        (async () => {
-          const classifyResponse = await inference({
-            text: classifyQueryPrompt({ query: payload.query }).prompt,
-            creativity: LLM_CREATIVITY_NONE,
-            quality: LLM_QUALITY_MEDIUM,
-            json: true,
-          });
-          queryCostUSD += classifyResponse.costUSD;
-          classification = classifyResponse.output.classification || 'other';
-        })(),
-      ]);
+        });
+
+        const inferenceResponse = await inference({
+          text: repurposeQueryPrompt({
+            history,
+            query: payload.query,
+          }).prompt,
+          creativity: LLM_CREATIVITY_MEDIUM,
+          quality: LLM_QUALITY_MEDIUM,
+        });
+        queryCostUSD += inferenceResponse.costUSD;
+        repurposedQuery = inferenceResponse.output || repurposedQuery;
+
+        log(`Repurposed query: ${payload.query} -> ${repurposedQuery}`);
+      })();
+
+      // --------------- Datasources ---------------
+
+      await (async () => {
+        datasourceIds = await findDatasourceIds({
+          organization: req.organization,
+          agentResId: payload.agent_id,
+          datasourceResIds: payload.datasource_ids,
+        });
+      })();
+
+      // --------------- Query classification ---------------
+
+      await (async () => {
+        const inferenceResponse = await inference({
+          text: classifyQueryPrompt({ query: repurposedQuery }).prompt,
+          creativity: LLM_CREATIVITY_NONE,
+          quality: LLM_QUALITY_MEDIUM,
+          json: true,
+        });
+        queryCostUSD += inferenceResponse.costUSD;
+        classification = inferenceResponse.output.classification || 'other';
+      })();
 
       // --------------- Stream management ---------------
 
@@ -652,7 +632,7 @@ module.exports = (router) => {
 
         const retrieveFromKnowledgeBase = async () => {
           logger.debug('datasource:call', 'retrieveFromKnowledgeBase');
-          logger.debug('datasource:query', payload.query);
+          logger.debug('datasource:query', repurposedQuery);
 
           const knowledge = [];
 
@@ -685,26 +665,14 @@ module.exports = (router) => {
             });
           }
 
-          if (!payload.query || _.isEmpty(searchDataSourceIds)) {
+          if (!repurposedQuery || _.isEmpty(searchDataSourceIds)) {
             return knowledge;
           }
-
-          const repurposeResponse = await inference({
-            text: repurposeQueryPrompt({
-              history: getQueryHistory(req.organization, conversation),
-              query: payload.query,
-            }).prompt,
-            creativity: LLM_CREATIVITY_NONE,
-            quality: LLM_QUALITY_MEDIUM,
-            json: true,
-          });
-          queryCostUSD += repurposeResponse.costUSD;
-          const query = repurposeResponse.output.phrase || payload.query;
 
           const { costUSD, chunks } = await retrieveChunks({
             organization: req.organization,
             datasourceIds: searchDataSourceIds,
-            prompt: query,
+            prompt: repurposedQuery,
             maxTokens: payload.max_tokens,
             maxChars: payload.max_chars,
             maxChunks: payload.max_chunks,
@@ -730,22 +698,44 @@ module.exports = (router) => {
 
         const knowledgeBase = await retrieveFromKnowledgeBase();
         const knowledgeIdToSource = {};
+        const knowledgeDocumentIdHash = {};
         const knowledgeToPrompt = [];
         _.each(knowledgeBase, (entry) => {
           knowledgeToPrompt.push(_.pick(entry, ['id', 'text', 'chunk']));
           knowledgeIdToSource[entry.id] = _.pick(entry, ['datasource_id', 'document_id']);
+          knowledgeDocumentIdHash[`${entry.datasource_id}/${entry.document_id}`] = true;
         });
+
+        // Add conversation history
+        const conversationHistory = [];
+        if (!_.isEmpty(conversation.history.turns)) {
+          let turnTokens = 0;
+          _.each(_.reverse(conversation.history.turns), (turn) => {
+            if (turnTokens >= HISTORY_MAXTOKENS) return;
+            turnTokens += turn.tokens;
+            conversationHistory.unshift({
+              user: turn.response.meta.repurposed_query,
+              assistant: turn.response.data.message,
+            });
+          });
+        }
 
         const chatResponse = await chatStream({
           quality: classification === 'task' ? LLM_QUALITY_HIGH : LLM_QUALITY_MEDIUM,
-          messages: createMessages(
-            req.organization,
-            conversation,
-            {
-              knowledge: _.map(knowledgeBase, (entry) => _.pick(entry, ['id', 'text', 'chunk'])),
-            },
-            payload,
-          ),
+          messages: [{
+            role: 'system',
+            content: chatInstructions({
+              instructions: getInstructions(req.organization, payload),
+              cannedResponse: getCannedResponse(),
+            }).prompt,
+          }, {
+            role: 'user',
+            content: chatPrompt({
+              knowledgeBase,
+              conversationHistory,
+              query: payload.query,
+            }).prompt,
+          }],
           tools,
           streamFn,
         });
@@ -758,14 +748,20 @@ module.exports = (router) => {
           const jsonResponse = JSON.parse(chatResponse.text);
           finalText = jsonResponse.response || finalText;
           // Find sources used to answer question
+          const usedKnowledgeDocumentIdHash = {};
           _.each(jsonResponse.citations, (citationId) => {
             if (knowledgeIdToSource[citationId]) {
-              sources.push(knowledgeIdToSource[citationId]);
+              const dt = knowledgeIdToSource[citationId];
+              sources.push(dt);
+              usedKnowledgeDocumentIdHash[`${dt.datasource_id}/${dt.document_id}`] = true;
             }
           });
           // Generate confidence level
-          if (knowledgeBase.length > 0) {
-            confidence = Math.ceil((jsonResponse.citations.length * 5) / knowledgeBase.length);
+          if (_.keys(knowledgeDocumentIdHash).length > 0) {
+            confidence = Math.ceil(
+              (_.keys(usedKnowledgeDocumentIdHash).length * 5)
+              / _.keys(knowledgeDocumentIdHash).length,
+            );
           }
         } catch (err) {
           // no-op
@@ -791,6 +787,7 @@ module.exports = (router) => {
         meta: {
           model,
           query: payload.query,
+          repurposed_query: repurposedQuery,
           processing_time_ms: Date.now() - now,
           transaction_id: req.transactionId,
         },
@@ -836,7 +833,7 @@ module.exports = (router) => {
       if (!conversation.title) {
         try {
           const titleResponse = await inference({
-            text: conversationTitlePrompt({ query: payload.query }).prompt,
+            text: conversationTitlePrompt({ query: repurposedQuery }).prompt,
             creativity: LLM_CREATIVITY_HIGH,
             quality: LLM_QUALITY_MEDIUM,
             json: true,

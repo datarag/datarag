@@ -4,13 +4,14 @@ const md5 = require('../helpers/md5');
 const db = require('../db/models');
 const registry = require('../registry');
 const { flattenText, cleanText } = require('../helpers/chunker');
-const { createEmbeddings, rerank } = require('../llms/cohere');
+const { rerank } = require('../llms/cohere');
 const { fullTextSearch } = require('../agents/fullTextSearch');
 const { semanticSearch } = require('../agents/semanticSearch');
 const config = require('../config');
 const logger = require('../logger');
 const { serializeDocument } = require('../helpers/serialize');
 const { TreeNode } = require('../helpers/treenode');
+const { createEmbeddings } = require('../agents/createEmbeddings');
 
 const RERANK_CUTOFF = config.get('retrieval:rerank:cutoff');
 const { Op } = db.Sequelize;

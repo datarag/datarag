@@ -8,6 +8,7 @@ const openai = require('../../llms/openai');
 const { countWords } = require('../../helpers/utils');
 const { chunkifyMarkdown } = require('../../helpers/chunker');
 const { LLM_CREATIVITY_NONE, LLM_QUALITY_MEDIUM } = require('../../constants');
+const { createEmbeddings } = require('../../agents/createEmbeddings');
 
 const PARALLEL_SIZE = 10;
 
@@ -198,7 +199,7 @@ async function indexDocument(payload) {
 
     // Create summary embeddings
     logger.info(`index:${payload.document_id}`, 'Create summary embedding');
-    const summaryEmbeddings = await cohere.createEmbeddings({
+    const summaryEmbeddings = await createEmbeddings({
       texts: [summary],
       type: 'document',
     });
@@ -222,7 +223,7 @@ async function indexDocument(payload) {
 
     // Create chunk embeddings by injecting context
     logger.info(`index:${payload.document_id}`, 'Create chunk embeddings');
-    const chunkEmbeddings = await cohere.createEmbeddings({
+    const chunkEmbeddings = await createEmbeddings({
       texts: _.map(chunks, (chunk) => `${context}\n\n---\n\n${chunk}`),
       type: 'document',
     });
@@ -254,7 +255,7 @@ async function indexDocument(payload) {
 
         logger.info(`index:${payload.document_id}`, `${response.questions.length} questions generated`);
 
-        const qEmbeddings = await cohere.createEmbeddings({
+        const qEmbeddings = await createEmbeddings({
           texts: response.questions,
           type: 'query',
         });
