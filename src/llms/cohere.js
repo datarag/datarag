@@ -27,6 +27,15 @@ const COHERE_CLIENT_REQUEST_OPTIONS = {
 const MAX_RETRIES = 10;
 
 /**
+ * Get the model used for embeddings generation
+ *
+ * @return {String}
+ */
+function getEmbeddingsModel() {
+  return COHERE_EMBEDDINGS_MODEL;
+}
+
+/**
  * Create embeddings over a set of texts for document or query use
  *
  * @param {*} { texts, type }
@@ -256,6 +265,7 @@ async function inference({
 
 module.exports = {
   inference,
+  getEmbeddingsModel,
   createEmbeddings,
   rerank,
 };

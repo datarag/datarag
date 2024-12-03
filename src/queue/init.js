@@ -21,6 +21,10 @@ async function initializeQueue() {
   addCron('cron:clean_raglog', {
     type: 'clean_raglog',
   }, '0 0 * * *');
+
+  addCron('cron:clean_embeddings', {
+    type: 'clean_embeddings',
+  }, '0 1 * * *');
 }
 
 module.exports = {

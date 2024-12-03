@@ -1,6 +1,7 @@
 const logger = require('../logger');
 const indexDocument = require('./jobs/indexDocument');
 const cleanRagLog = require('./jobs/cleanRagLog');
+const cleanEmbeddings = require('./jobs/cleanEmbeddings');
 
 function Worker(job) {
   const proc = async () => {
@@ -12,6 +13,8 @@ function Worker(job) {
         await indexDocument(data);
       } else if (data.type === 'clean_raglog') {
         await cleanRagLog();
+      } else if (data.type === 'clean_embeddings') {
+        await cleanEmbeddings();
       }
     } catch (e) {
       logger.warn('worker', `Failed to process job ${job.id}`);

@@ -1,6 +1,8 @@
 require('events').EventEmitter.defaultMaxListeners = 0;
 
 jest.mock('../src/llms/cohere', () => ({
+  getEmbeddingsModel: jest.fn(() => 'model'),
+
   createEmbeddings: jest.fn(async ({ texts }) => {
     function range(start, end, step = 1) {
       const result = [];
