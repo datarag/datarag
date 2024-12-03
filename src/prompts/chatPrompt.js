@@ -32,7 +32,7 @@ module.exports = ({
     prompt.push('-------\n');
   }
 
-  prompt.push('User question:');
+  prompt.push('Now answer this user query by following your instructions:');
   prompt.push(query);
 
   return {
