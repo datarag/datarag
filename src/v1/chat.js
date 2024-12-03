@@ -721,7 +721,10 @@ module.exports = (router) => {
         }
 
         const chatResponse = await chatStream({
-          quality: classification === 'task' ? LLM_QUALITY_HIGH : LLM_QUALITY_MEDIUM,
+          quality:
+            classification === 'task' || !_.isEmpty(tools)
+              ? LLM_QUALITY_HIGH
+              : LLM_QUALITY_MEDIUM,
           messages: [{
             role: 'system',
             content: chatInstructions({
