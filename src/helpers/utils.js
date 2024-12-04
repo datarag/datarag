@@ -170,11 +170,26 @@ function findAverage(arr) {
   return average;
 }
 
+/**
+ * Trims a string to a maximum length of X characters.
+ *
+ * @param {string} str - The string to be trimmed.
+ * @param {number} maxLength - The maximum number of characters to retain.
+ * @returns {string} - The trimmed string.
+ */
+function trimString(str, maxLength) {
+  if (!str || str.length <= maxLength) {
+    return str;
+  }
+  return str.substring(0, maxLength);
+}
+
 module.exports = {
   isSafeUrl,
   fetchAndCleanHtml,
   countWords,
   trimTextToMaxWords,
+  trimString,
   cosineSimilarity,
   convertToFunctionName,
   nameFunction,

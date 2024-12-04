@@ -7,7 +7,7 @@ const { Op } = db.Sequelize;
 const RETENTION_DAYS = config.get('embeddings:retentiondays');
 
 async function cleanEmbeddings() {
-  const rows = await db.Embeddings.destroy({
+  const rows = await db.Embedding.destroy({
     where: {
       createdAt: {
         [Op.lt]: new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000),

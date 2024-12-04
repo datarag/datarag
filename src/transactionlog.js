@@ -4,6 +4,7 @@ const db = require('./db/models');
 const { obfuscate } = require('./helpers/obfuscator');
 const config = require('./config');
 const logger = require('./logger');
+const { trimString } = require('./helpers/utils');
 
 const AUDITLOG_ENABLED = config.get('auditlog:enabled');
 const COSTLOG_ENABLED = config.get('costlog:enabled');
@@ -15,9 +16,9 @@ async function logTransaction(req, res) {
       await db.AuditLog.create({
         OrganizationId: req.organization ? req.organization.id : null,
         ApiKeyId: req.apiKey ? req.apiKey.id : null,
-        ipAddress: req.ip,
+        ipAddress: trimString(req.ip, 255),
         transactionId: req.transactionId,
-        action: `${req.method} ${req.path}`,
+        action: trimString(`${req.method} ${req.path}`, 255),
         status: `${res.statusCode}`,
         details: _.isObject(req.body) ? obfuscate(req.body) : null,
       });

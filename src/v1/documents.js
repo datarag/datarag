@@ -1,17 +1,4 @@
 /* eslint-disable no-loop-func */
-// Polyfill for pdfjs
-if (typeof Promise.withResolvers === 'undefined') {
-  Promise.withResolvers = function pf() {
-    let resolve;
-    let reject;
-    const promise = new Promise((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    return { promise, resolve, reject };
-  };
-}
-
 const _ = require('lodash');
 const pdf2md = require('@opendocsg/pdf2md');
 const TurndownService = require('turndown');

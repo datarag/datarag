@@ -836,7 +836,12 @@ module.exports = (router) => {
       if (!conversation.title) {
         try {
           const titleResponse = await inference({
-            text: conversationTitlePrompt({ query: repurposedQuery }).prompt,
+            text: conversationTitlePrompt({
+              query: `
+${repurposedQuery}
+${finalResponse.data.message}
+              `,
+            }).prompt,
             creativity: LLM_CREATIVITY_HIGH,
             quality: LLM_QUALITY_MEDIUM,
             json: true,
