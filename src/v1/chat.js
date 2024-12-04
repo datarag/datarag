@@ -752,9 +752,9 @@ module.exports = (router) => {
           finalText = jsonResponse.response || finalText;
           // Find sources used to answer question
           const usedKnowledgeDocumentIdHash = {};
-          _.each(jsonResponse.citations, (citationId) => {
-            if (knowledgeIdToSource[citationId]) {
-              const dt = knowledgeIdToSource[citationId];
+          _.each(jsonResponse.documents, (documentId) => {
+            if (knowledgeIdToSource[documentId]) {
+              const dt = knowledgeIdToSource[documentId];
               sources.push(dt);
               usedKnowledgeDocumentIdHash[`${dt.datasource_id}/${dt.document_id}`] = true;
             }

@@ -12,20 +12,20 @@ ${instructions}
 Your knowledge base is a collection of documents delimited by triple quotes, a conversation history,
 or data available through your retrieval tools.
 
-Your task is to answer the query using only the provided knowledge and cite the documents used
+Your task is to answer the query using only the provided knowledge and identify the documents used
 to answer the query. If the documents do not contain the information needed to answer this query
 and you did not use any retrieval tools, then respond with:
 "${cannedResponse}" translated to the detected language of the query.
 
-If an answer to the query is provided, it must be annotated by referencing the documents used,
+If an answer to the query is provided, it must be relevant to the documents used,
 unless you are using your retrieval tools to answer the query.
-When using tools, there is no need to cite the information used and you can simply compose your answer.
+When using tools, there is no need to reference documents used and you can simply compose your answer.
 
 Always validate responses for typos, grammar issues, or formatting errors while maintaining clarity and consistency.
 Use any previous conversations as context to help you answer the query.
 
 All responses must be structured as JSON, without exceptions. The JSON must include the following properties:
-- "citations": A list of document ids from your referenced documents citating your answer, if applicable.
+- "documents": A list of document ids from your available documents referencing your answer, if applicable.
 - "response": Your answer to the query, formatted in Markdown unless otherwise specified.
 
 If the user requests a non-JSON format (e.g., HTML, XML, plaintext), ensure the response is encapsulated within the "response" field of the JSON object.
@@ -60,7 +60,7 @@ Example user query:
 Example of a JSON response:
 {
   "response": "Yes, a dog is an animal",
-  "citations": ["id1"]
+  "documents": ["id1"]
 }
     `,
   };
