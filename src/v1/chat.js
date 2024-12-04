@@ -672,7 +672,10 @@ module.exports = (router) => {
           const { costUSD, chunks } = await retrieveChunks({
             organization: req.organization,
             datasourceIds: searchDataSourceIds,
-            prompt: repurposedQuery,
+            prompt: `
+${payload.query}
+${payload.query !== repurposedQuery ? repurposedQuery : ''}
+            `.trim(),
             maxTokens: payload.max_tokens,
             maxChars: payload.max_chars,
             maxChunks: payload.max_chunks,
