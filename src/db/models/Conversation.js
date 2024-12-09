@@ -6,6 +6,8 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       Conversation.belongsTo(models.Organization);
       Conversation.belongsTo(models.ApiKey);
+      Conversation.hasMany(models.Turn);
+      Conversation.hasOne(models.Datasource);
     }
   }
   Conversation.init({
@@ -13,7 +15,6 @@ module.exports = (sequelize, DataTypes) => {
     ApiKeyId: DataTypes.BIGINT,
     resId: DataTypes.STRING,
     title: DataTypes.STRING,
-    history: DataTypes.JSONB,
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
   }, {

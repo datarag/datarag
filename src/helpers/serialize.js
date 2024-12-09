@@ -80,10 +80,27 @@ function serializeConversation(model) {
   };
 }
 
+/**
+ * Serialize turn
+ *
+ * @param {*} model
+ * @return {*}
+ */
+function serializeTurn(model) {
+  return {
+    id: model.resId,
+    payload: model.payload,
+    metadata: model.metadata,
+    tokens: model.tokens,
+    date: model.createdAt.toISOString(),
+  };
+}
+
 module.exports = {
   serializeDatasource,
   serializeAgent,
   serializeDocument,
   serializeConnector,
   serializeConversation,
+  serializeTurn,
 };

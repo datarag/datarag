@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     // eslint-disable-next-line no-unused-vars
     static associate(models) {
       Datasource.belongsTo(models.Organization);
+      Datasource.belongsTo(models.Conversation);
       Datasource.belongsToMany(models.Agent, {
         through: models.AgentDatasource,
       });
@@ -16,6 +17,7 @@ module.exports = (sequelize, DataTypes) => {
   }
   Datasource.init({
     OrganizationId: DataTypes.BIGINT,
+    ConversationId: DataTypes.BIGINT,
     resId: DataTypes.STRING,
     name: DataTypes.STRING,
     purpose: DataTypes.TEXT,

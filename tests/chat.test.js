@@ -57,6 +57,42 @@ describe('Chat API', () => {
       });
     });
 
+    it('should process a valid chat request with conversation history', async () => {
+      const agent = supertest.agent(app);
+
+      chatStream.mockResolvedValue({
+        text: '{ "response": "Machine learning is a subset of AI." }',
+        model: 'gpt-4o',
+        costUSD: 0.001,
+        messages: [{ role: 'user', content: 'What is machine learning?' }],
+      });
+
+      inference.mockResolvedValue({
+        model: 'gpt-test',
+        output: { classification: 'unknown' },
+        costUSD: 0,
+      });
+
+      const res = await agent
+        .post('/v1/chat')
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            query: 'What is machine learning?',
+            instructions: 'You are a helpful assistant',
+            datasource_ids: [factory.datasource.resId],
+            conversation_id: factory.conversation.resId,
+          },
+        });
+
+      expect(res.statusCode).toEqual(200);
+      expect(res.body.data.message).toEqual('Machine learning is a subset of AI.');
+      expect(res.body.meta).toMatchObject({
+        query: 'What is machine learning?',
+        model: 'gpt-4o',
+      });
+    });
+
     it('should stream responses when stream is set to true', async () => {
       const agent = supertest.agent(app);
 
@@ -94,6 +130,28 @@ describe('Chat API', () => {
       expect(res.text).toContain('Machine');
       expect(res.text).toContain(' learning is');
       expect(res.text).toContain(' a subset of AI.');
+    });
+
+    it('should return 400 on invalid conversation id', async () => {
+      const agent = supertest.agent(app);
+
+      const res = await agent
+        .post('/v1/chat')
+        .set('Authorization', `Bearer ${TOKEN}`)
+        .send({
+          data: {
+            query: 'What is machine learning?',
+            instructions: 'You are a helpful assistant',
+            datasource_ids: [factory.datasource.resId],
+            conversation_id: 'invalid',
+          },
+        });
+
+      expect(res.statusCode).toEqual(400);
+      expect(res.body).toEqual({
+        errors: ['Invalid conversation_id'],
+        message: 'Bad request',
+      });
     });
 
     it('should return a 400 error if no query is provided', async () => {

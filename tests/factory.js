@@ -90,19 +90,23 @@ async function setupOrg(name) {
     ApiKeyId: apiKey.id,
     resId: name,
     title: name,
-    history: {
-      provider: 'gpt',
-      turns: [{
-        response: {
-          data: {
-            message: name,
-          },
-          meta: {
-            transaction_id: name,
-          },
-        },
-      }],
+  });
+
+  const turn = await db.Turn.create({
+    OrganizationId: organization.id,
+    ApiKeyId: apiKey.id,
+    ConversationId: conversation.id,
+    resId: name,
+    payload: {
+      data: {
+        message: name,
+      },
+      meta: {
+        transaction_id: name,
+      },
     },
+    metadata: {},
+    tokens: 100,
   });
 
   return {
@@ -114,6 +118,7 @@ async function setupOrg(name) {
     document,
     connector,
     conversation,
+    turn,
   };
 }
 

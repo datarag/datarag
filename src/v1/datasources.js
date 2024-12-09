@@ -1,7 +1,7 @@
 const _ = require('lodash');
+const { nanoid } = require('nanoid');
 const { apiRoute, conflictResponse, notFoundResponse } = require('../helpers/responses');
 const { serializeDatasource } = require('../helpers/serialize');
-const { generateRandomHash } = require('../helpers/tokens');
 const db = require('../db/models');
 const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
 
@@ -36,6 +36,27 @@ module.exports = (router) => {
   *           type: string
   *           example: '2024-11-20T06:50:31.958Z'
   *           description: Datasource creation datetime
+  *
+  *     UpdateDatasource:
+  *       type: object
+  *       properties:
+  *         id:
+  *           type: string
+  *           pattern: '^[a-zA-Z0-9_-]+$'
+  *           maxLength: 255
+  *           example: 'help-center'
+  *           description: A unique datasource id.
+  *         name:
+  *           type: string
+  *           maxLength: 255
+  *           example: 'Help center'
+  *           description: The name of the datasource.
+  *         purpose:
+  *           type: string
+  *           example: 'Contains help articles and HOW-TOs on using the product'
+  *           description: |
+  *             The purpose of this datasource. Please be as descriptive as possible so that LLMs
+  *             have a good understanding about the content encapsulated.
   *
   *     NewDatasource:
   *       type: object
@@ -115,15 +136,18 @@ module.exports = (router) => {
       const limitNum = parseInt(limit, 10);
 
       const queryOptions = {
+        where: {
+          ConversationId: {
+            [Op.is]: null,
+          },
+        },
         order: [['id', 'ASC']],
         limit: limitNum,
       };
 
       if (cursor) {
-        queryOptions.where = {
-          id: {
-            [Op.gt]: cursor,
-          },
+        queryOptions.where.id = {
+          [Op.gt]: cursor,
         };
       }
 
@@ -228,7 +252,7 @@ module.exports = (router) => {
 
       const datasource = await db.Datasource.create({
         OrganizationId: req.organization.id,
-        resId: `dsrc-${generateRandomHash()}`,
+        resId: `dsrc-${nanoid()}`,
         name: payload.name,
         purpose: payload.purpose,
       });
@@ -286,6 +310,9 @@ module.exports = (router) => {
         where: {
           OrganizationId: req.organization.id,
           resId: req.params.datasource_id,
+          ConversationId: {
+            [Op.is]: null,
+          },
         },
       });
       if (!datasource) {
@@ -326,7 +353,7 @@ module.exports = (router) => {
   *               - data
   *             properties:
   *               data:
-  *                 $ref: '#/components/schemas/Datasource'
+  *                 $ref: '#/components/schemas/UpdateDatasource'
   *     responses:
   *       '200':
   *         description: Datasource updated
@@ -370,6 +397,9 @@ module.exports = (router) => {
         where: {
           OrganizationId: req.organization.id,
           resId: req.params.datasource_id,
+          ConversationId: {
+            [Op.is]: null,
+          },
         },
       });
       if (!datasource) {
@@ -447,6 +477,9 @@ module.exports = (router) => {
         where: {
           OrganizationId: req.organization.id,
           resId: req.params.datasource_id,
+          ConversationId: {
+            [Op.is]: null,
+          },
         },
       });
       if (!datasource) {

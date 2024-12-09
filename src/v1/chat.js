@@ -3,7 +3,7 @@ const axios = require('axios');
 const _ = require('lodash');
 const { nanoid, customAlphabet } = require('nanoid');
 const db = require('../db/models');
-const { apiRoute } = require('../helpers/responses');
+const { apiRoute, badRequestResponse } = require('../helpers/responses');
 const { getCannedResponse } = require('../helpers/cannedResponse');
 const logger = require('../logger');
 const config = require('../config');
@@ -36,6 +36,7 @@ const HISTORY_MAXTOKENS = config.get('chat:history:maxtokens');
 const INSTRUCTIONS_MAXTOKENS = config.get('chat:instructions:maxtokens');
 const TURN_CONTEXT_MAXTOKENS = config.get('chat:turn:context:maxtokens');
 const MAX_CONVERSATIONS = config.get('chat:max:conversations');
+const MAX_TURNS = config.get('chat:max:turns');
 
 /**
  * Extract the "response" property from a partial build JSON
@@ -120,51 +121,6 @@ async function getInstructions(organization, payload) {
   return truncateToTokens(instructions, INSTRUCTIONS_MAXTOKENS).text;
 }
 
-/**
- * Get or create conversation
- *
- * @param {*} organization
- * @param {*} apiKey
- * @param {*} provider
- * @param {*} payload
- * @return {*}
- */
-async function getOrCreateConversation(organization, apiKey, provider, payload) {
-  let conversation;
-
-  if (payload.conversation_id) {
-    conversation = await db.Conversation.findOne({
-      where: {
-        OrganizationId: organization.id,
-        ApiKeyId: apiKey.id,
-        resId: payload.conversation_id,
-      },
-    });
-
-    // Check conversation versioning
-    if (conversation && conversation.history.provider !== provider) {
-      conversation = null;
-    }
-
-    if (conversation) {
-      return conversation;
-    }
-  }
-
-  // Create new conversation
-  conversation = await db.Conversation.create({
-    OrganizationId: organization.id,
-    ApiKeyId: apiKey.id,
-    resId: nanoid(),
-    history: {
-      provider,
-      turns: [],
-    },
-  });
-
-  return conversation;
-}
-
 module.exports = (router) => {
   /**
   * @swagger
@@ -182,7 +138,7 @@ module.exports = (router) => {
   *         conversation_id:
   *           type: string
   *           example: c5cb1ff3
-  *           description: Conversation id to be able to continue conversations with memory.
+  *           description: Conversation id associated with this chat turn or null.
   *         chunk:
   *           type: string
   *           example: |
@@ -262,7 +218,9 @@ module.exports = (router) => {
   *         conversation_id:
   *           type: string
   *           example: c5cb1ff3
-  *           description: Previous conversation id to continue conversations with memory.
+  *           description: |
+  *             Optionally associate this chat turn with
+  *             a Conversation to continue chat with memory.
   *         stream:
   *           type: boolean
   *           example: true
@@ -367,7 +325,6 @@ module.exports = (router) => {
   router.post(
     '/chat',
     apiRoute(SCOPE_CHAT, async (req, res) => {
-      const provider = 'openai-v1';
       const now = Date.now();
       const uuid = nanoid();
       const cannedResponse = getCannedResponse();
@@ -377,6 +334,7 @@ module.exports = (router) => {
 
       let datasourceIds = [];
       let conversation = null;
+      let turns = [];
       let classification = 'other';
       const sources = [];
       let confidence = 0;
@@ -397,7 +355,6 @@ module.exports = (router) => {
       // Initiate RAG log object
       const ragLog = new TreeNode({
         type: 'chat',
-        provider,
         timestamp: now,
       });
       ragLog.startMeasure();
@@ -405,28 +362,40 @@ module.exports = (router) => {
 
       // --------------- Conversation history ---------------
 
-      conversation = await getOrCreateConversation(
-        req.organization,
-        req.apiKey,
-        provider,
-        payload,
-      );
+      if (payload.conversation_id) {
+        conversation = await db.Conversation.findOne({
+          where: {
+            OrganizationId: req.organization.id,
+            ApiKeyId: req.apiKey.id,
+            resId: payload.conversation_id,
+          },
+        });
+
+        if (!conversation) {
+          badRequestResponse(req, res, 'Invalid conversation_id');
+          return;
+        }
+
+        turns = await conversation.getTurns({
+          order: [['createdAt', 'ASC']],
+        });
+      }
 
       // --------------- Reformulate query ---------------
 
       await (async () => {
-        if (_.isEmpty(conversation.history.turns)) return;
+        if (_.isEmpty(turns)) return;
 
         const history = [];
 
         // Add previous turns
         let turnTokens = 0;
-        _.each(_.reverse(conversation.history.turns), (turn) => {
+        _.each(_.reverse(turns), (turn) => {
           if (turnTokens >= REPURPOSE_MAXTOKENS) return;
           turnTokens += turn.tokens;
           history.unshift({
-            user: turn.response.meta.query,
-            assistant: turn.response.data.message,
+            user: turn.payload.meta.query,
+            assistant: turn.payload.data.message,
           });
         });
 
@@ -451,6 +420,7 @@ module.exports = (router) => {
           organization: req.organization,
           agentResId: payload.agent_id,
           datasourceResIds: payload.datasource_ids,
+          conversationResId: payload.conversation_id,
         });
       })();
 
@@ -711,14 +681,14 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
 
         // Add conversation history
         const conversationHistory = [];
-        if (!_.isEmpty(conversation.history.turns)) {
+        if (!_.isEmpty(turns)) {
           let turnTokens = 0;
-          _.each(_.reverse(conversation.history.turns), (turn) => {
+          _.each(_.reverse(turns), (turn) => {
             if (turnTokens >= HISTORY_MAXTOKENS) return;
             turnTokens += turn.tokens;
             conversationHistory.unshift({
-              user: turn.response.meta.repurposed_query,
-              assistant: turn.response.data.message,
+              user: turn.payload.meta.repurposed_query,
+              assistant: turn.payload.data.message,
             });
           });
         }
@@ -781,7 +751,7 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
       const finalResponse = {
         data: {
           message: finalText || cannedResponse,
-          conversation_id: conversation.resId,
+          conversation_id: conversation ? conversation.resId : null,
           finished: true,
           classification,
           confidence,
@@ -815,70 +785,92 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
         res.end();
       }
 
-      // -------- Add to conversation --------
+      if (conversation) {
+        // -------- Add to conversation turns --------
 
-      await conversation.update({
-        history: {
-          ...conversation.history,
-          turns: [
-            ...conversation.history.turns,
-            {
-              response: finalResponse,
-              timestamp: Date.now(),
-              metadata: payload.turn_metadata || {},
-              tokens:
-                textToTokens(finalResponse.data.message).length
-                + textToTokens(finalResponse.meta.query).length,
-            },
-          ],
-        },
-      });
-
-      // -------- Create title --------
-
-      if (!conversation.title) {
-        try {
-          const titleResponse = await inference({
-            text: conversationTitlePrompt({
-              query: `
-${repurposedQuery}
-${finalResponse.data.message}
-              `,
-            }).prompt,
-            creativity: LLM_CREATIVITY_HIGH,
-            quality: LLM_QUALITY_MEDIUM,
-            json: true,
-          });
-          await conversation.update({
-            title: titleResponse.output.title || 'Unnamed',
-          });
-        } catch (err) {
-          // no-op
-        }
-      }
-
-      // -------- Delete history --------
-
-      const idsToDelete = await db.Conversation.findAll({
-        where: {
-          OrganizationId: req.organization.id,
-          ApiKeyId: req.apiKey.id,
-        },
-        attributes: ['id'],
-        order: [['updatedAt', 'DESC']],
-        offset: MAX_CONVERSATIONS,
-        raw: true,
-      }).then((records) => records.map((record) => record.id));
-
-      if (idsToDelete.length > 0) {
-        log(`Deleting ${idsToDelete.length} past conversations`);
-        await db.Conversation.destroy({
-          where: {
-            id: {
-              [Op.in]: idsToDelete,
-            },
-          },
+        await db.Turn.create({
+          OrganizationId: conversation.OrganizationId,
+          ApiKeyId: conversation.ApiKeyId,
+          ConversationId: conversation.id,
+          resId: `turn-${nanoid()}`,
+          payload: finalResponse,
+          metadata: payload.turn_metadata || {},
+          tokens:
+            textToTokens(finalResponse.data.message).length
+            + textToTokens(finalResponse.meta.query).length,
         });
+
+        await (async () => {
+          const idsToDelete = await db.Turn.findAll({
+            where: {
+              ConversationId: conversation.id,
+            },
+            attributes: ['id'],
+            order: [['updatedAt', 'DESC']],
+            offset: MAX_TURNS,
+            raw: true,
+          }).then((records) => records.map((record) => record.id));
+
+          if (idsToDelete.length > 0) {
+            log(`Deleting ${idsToDelete.length} past turns`);
+            await db.Turn.destroy({
+              where: {
+                id: {
+                  [Op.in]: idsToDelete,
+                },
+              },
+            });
+          }
+        })();
+
+        // -------- Create title --------
+
+        if (!conversation.title) {
+          try {
+            const titleResponse = await inference({
+              text: conversationTitlePrompt({
+                query: `
+  ${repurposedQuery}
+  ${finalResponse.data.message}
+                `,
+              }).prompt,
+              creativity: LLM_CREATIVITY_HIGH,
+              quality: LLM_QUALITY_MEDIUM,
+              json: true,
+            });
+            await conversation.update({
+              title: titleResponse.output.title || 'Unnamed',
+            });
+          } catch (err) {
+            // no-op
+          }
+        }
+
+        // -------- Delete history --------
+
+        await (async () => {
+          const idsToDelete = await db.Conversation.findAll({
+            where: {
+              OrganizationId: req.organization.id,
+              ApiKeyId: req.apiKey.id,
+            },
+            attributes: ['id'],
+            order: [['updatedAt', 'DESC']],
+            offset: MAX_CONVERSATIONS,
+            raw: true,
+          }).then((records) => records.map((record) => record.id));
+
+          if (idsToDelete.length > 0) {
+            log(`Deleting ${idsToDelete.length} past conversations`);
+            await db.Conversation.destroy({
+              where: {
+                id: {
+                  [Op.in]: idsToDelete,
+                },
+              },
+            });
+          }
+        })();
       }
     }),
   );
