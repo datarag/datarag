@@ -1,19 +1,16 @@
 /* eslint-disable no-loop-func */
 const _ = require('lodash');
-const pdf2md = require('@opendocsg/pdf2md');
-const TurndownService = require('turndown');
+const { nanoid } = require('nanoid');
 const { apiRoute, notFoundResponse, badRequestResponse } = require('../helpers/responses');
 const { serializeDocument } = require('../helpers/serialize');
-const { generateRandomHash } = require('../helpers/tokens');
 const md5 = require('../helpers/md5');
 const db = require('../db/models');
 const { addJob } = require('../queue');
 const logger = require('../logger');
-const { fetchAndCleanHtml } = require('../helpers/utils');
 const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
+const { convertSource } = require('../helpers/converter');
 
 const { Op } = db.Sequelize;
-const turndownService = new TurndownService();
 
 module.exports = (router) => {
   /**
@@ -283,32 +280,17 @@ module.exports = (router) => {
       // Original content
       const contentSource = payload.content;
       // Markdown content
-      let content = contentSource;
-      // Preprocess
-      if (payload.type === 'url') {
-        try {
-          content = await fetchAndCleanHtml(contentSource);
-        } catch (err) {
-          badRequestResponse(req, res, 'Provided URL is invalid or unreachable');
-          return;
-        }
-      }
-      // Convert text to Markdown
-      switch (payload.type) {
-        case 'pdf':
-          content = await pdf2md(Uint8Array.from(atob(content), (c) => c.charCodeAt(0)));
-          break;
-        case 'url':
-        case 'html':
-          content = turndownService.turndown(content);
-          break;
-        case 'text':
-        case 'markdown':
-        default:
-          break;
-      }
+      let content;
 
-      content = (content || '').trim();
+      try {
+        content = await convertSource({
+          content: payload.content,
+          type: payload.type,
+        });
+      } catch (err) {
+        badRequestResponse(req, res, 'Provided URL is invalid or unreachable');
+        return;
+      }
 
       if (!content) {
         badRequestResponse(req, res, 'Could not process content');
@@ -318,7 +300,7 @@ module.exports = (router) => {
       const fields = {
         OrganizationId: req.organization.id,
         DatasourceId: datasource.id,
-        resId: resId || `doc-${generateRandomHash()}`,
+        resId: resId || `doc-${nanoid()}`,
         name: payload.name,
         content,
         contentSource,

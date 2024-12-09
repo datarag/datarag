@@ -70,6 +70,9 @@ nconf.set('chat:turn:context:maxtokens', getEnvironment('DATARAG_CHAT_TURN_CONTE
 // Max conversation history size
 nconf.set('chat:max:conversations', getEnvironment('DATARAG_CHAT_MAX_CONVERSATIONS', 100));
 
+// Max conversation turns per conversation
+nconf.set('chat:max:turns', getEnvironment('DATARAG_CHAT_MAX_TURNS', 100));
+
 // Logs
 nconf.set('auditlog:enabled', getEnvironment('DATARAG_AUDITLOG_ENABLED', true));
 nconf.set('costlog:enabled', getEnvironment('DATARAG_COSTLOG_ENABLED', true));

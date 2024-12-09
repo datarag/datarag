@@ -1,7 +1,7 @@
 const _ = require('lodash');
+const { nanoid } = require('nanoid');
 const { apiRoute, notFoundResponse, badRequestResponse } = require('../helpers/responses');
 const { serializeConnector } = require('../helpers/serialize');
-const { generateRandomHash } = require('../helpers/tokens');
 const db = require('../db/models');
 const { convertToFunctionName, isSafeUrl } = require('../helpers/utils');
 const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
@@ -310,7 +310,7 @@ module.exports = (router) => {
       const fields = {
         OrganizationId: req.organization.id,
         DatasourceId: datasource.id,
-        resId: resId || `conn-${generateRandomHash()}`,
+        resId: resId || `conn-${nanoid()}`,
         name: payload.name,
         purpose: payload.purpose,
         endpoint: payload.endpoint,

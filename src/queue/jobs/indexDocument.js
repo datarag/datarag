@@ -159,7 +159,12 @@ async function indexDocument(payload) {
   if (!document) return;
 
   try {
+    await document.update({
+      status: 'indexing',
+    });
+
     let indexCostUSD = 0;
+    let context = '';
     const text = document.content;
 
     if (!text) {
@@ -181,39 +186,40 @@ async function indexDocument(payload) {
 
     // ----------------------------------- SUMMARY -------------------------------------------------
 
-    // Create summary
-    logger.info(`index:${payload.document_id}`, 'Generate summary');
-    let summary = '';
-    let context = '';
-    if (countWords(text) >= 200) {
-      const response = await summarize({
-        text,
-        maxWords: 200,
-      });
-      summary = response.summary;
-      context = response.context;
-      indexCostUSD += response.costUSD;
-    } else {
-      summary = text;
-    }
+    if (payload.knowledge !== 'shallow') {
+      // Create summary
+      logger.info(`index:${payload.document_id}`, 'Generate summary');
+      let summary = '';
+      if (countWords(text) >= 200) {
+        const response = await summarize({
+          text,
+          maxWords: 200,
+        });
+        summary = response.summary;
+        context = response.context;
+        indexCostUSD += response.costUSD;
+      } else {
+        summary = text;
+      }
 
-    // Create summary embeddings
-    logger.info(`index:${payload.document_id}`, 'Create summary embedding');
-    const summaryEmbeddings = await createEmbeddings({
-      texts: [summary],
-      type: 'document',
-    });
-    indexCostUSD += summaryEmbeddings.costUSD;
-    await db.Chunk.create({
-      OrganizationId: document.OrganizationId,
-      DatasourceId: document.DatasourceId,
-      DocumentId: document.id,
-      type: 'summary',
-      content: summary,
-      contentSize: summary.length,
-      contentTokens: countTokens(summary),
-      embedding: summaryEmbeddings.embeddings[0],
-    });
+      // Create summary embeddings
+      logger.info(`index:${payload.document_id}`, 'Create summary embedding');
+      const summaryEmbeddings = await createEmbeddings({
+        texts: [summary],
+        type: 'document',
+      });
+      indexCostUSD += summaryEmbeddings.costUSD;
+      await db.Chunk.create({
+        OrganizationId: document.OrganizationId,
+        DatasourceId: document.DatasourceId,
+        DocumentId: document.id,
+        type: 'summary',
+        content: summary,
+        contentSize: summary.length,
+        contentTokens: countTokens(summary),
+        embedding: summaryEmbeddings.embeddings[0],
+      });
+    }
 
     // ----------------------------------- CHUNKS -------------------------------------------------
 
@@ -243,41 +249,45 @@ async function indexDocument(payload) {
 
     // ---------------------------------- QUESTION BANK -------------------------------------------
 
-    logger.info(`index:${payload.document_id}`, 'Create question bank');
-    const chunkGroups = _.chunk(chunkModels, PARALLEL_SIZE);
-    for (let i = 0; i < chunkGroups.length; i += 1) {
-      await Promise.all(_.map(chunkGroups[i], async (chunkModel) => {
-        const response = await questionBank({ text: chunkModel.content });
-        indexCostUSD += response.costUSD;
-        if (_.isEmpty(response.questions)) {
-          return;
-        }
+    if (payload.knowledge !== 'shallow') {
+      logger.info(`index:${payload.document_id}`, 'Create question bank');
+      const chunkGroups = _.chunk(chunkModels, PARALLEL_SIZE);
+      for (let i = 0; i < chunkGroups.length; i += 1) {
+        await Promise.all(_.map(chunkGroups[i], async (chunkModel) => {
+          const response = await questionBank({ text: chunkModel.content });
+          indexCostUSD += response.costUSD;
+          if (_.isEmpty(response.questions)) {
+            return;
+          }
 
-        logger.info(`index:${payload.document_id}`, `${response.questions.length} questions generated`);
+          logger.info(`index:${payload.document_id}`, `${response.questions.length} questions generated`);
 
-        const qEmbeddings = await createEmbeddings({
-          texts: response.questions,
-          type: 'query',
-        });
-        indexCostUSD += qEmbeddings.costUSD;
-        const qChunks = await db.Chunk.bulkCreate(_.map(response.questions, (question, index) => ({
-          OrganizationId: document.OrganizationId,
-          DatasourceId: document.DatasourceId,
-          DocumentId: document.id,
-          type: 'question',
-          content: question,
-          contentSize: question.length,
-          contentTokens: countTokens(question),
-          embedding: qEmbeddings.embeddings[index],
-        })));
+          const qEmbeddings = await createEmbeddings({
+            texts: response.questions,
+            type: 'query',
+          });
+          indexCostUSD += qEmbeddings.costUSD;
+          const qChunks = await db.Chunk.bulkCreate(
+            _.map(response.questions, (question, index) => ({
+              OrganizationId: document.OrganizationId,
+              DatasourceId: document.DatasourceId,
+              DocumentId: document.id,
+              type: 'question',
+              content: question,
+              contentSize: question.length,
+              contentTokens: countTokens(question),
+              embedding: qEmbeddings.embeddings[index],
+            })),
+          );
 
-        await db.Relation.bulkCreate(_.map(qChunks, (qChunk) => ({
-          OrganizationId: document.OrganizationId,
-          DatasourceId: document.DatasourceId,
-          ChunkId: qChunk.id,
-          TargetChunkId: chunkModel.id,
-        })));
-      }));
+          await db.Relation.bulkCreate(_.map(qChunks, (qChunk) => ({
+            OrganizationId: document.OrganizationId,
+            DatasourceId: document.DatasourceId,
+            ChunkId: qChunk.id,
+            TargetChunkId: chunkModel.id,
+          })));
+        }));
+      }
     }
 
     // Done
