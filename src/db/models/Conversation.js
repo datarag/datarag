@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
       Conversation.belongsTo(models.Organization);
       Conversation.belongsTo(models.ApiKey);
       Conversation.hasMany(models.Turn);
-      Conversation.hasOne(models.Datasource);
+      Conversation.hasMany(models.Datasource);
     }
   }
   Conversation.init({

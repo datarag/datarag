@@ -13,6 +13,7 @@ const { SCOPE_CHAT } = require('../scopes');
 const md5 = require('../helpers/md5');
 const { convertSource } = require('../helpers/converter');
 const indexDocument = require('../queue/jobs/indexDocument');
+const { RESID_PREFIX_CONVERSATION, RESID_PREFIX_CONVERSATION_DOCUMENT } = require('../constants');
 
 const MAX_CONVERSATIONS = config.get('chat:max:conversations');
 
@@ -291,7 +292,7 @@ module.exports = (router) => {
       const conversation = await db.Conversation.create({
         OrganizationId: req.organization.id,
         ApiKeyId: req.apiKey.id,
-        resId: `conv-${nanoid()}`,
+        resId: `${RESID_PREFIX_CONVERSATION}${nanoid()}`,
         title: payload.title || '',
       });
 
@@ -636,7 +637,7 @@ module.exports = (router) => {
       const fields = {
         OrganizationId: req.organization.id,
         DatasourceId: datasource.id,
-        resId: `doc-conv-${nanoid()}`,
+        resId: `${RESID_PREFIX_CONVERSATION_DOCUMENT}${nanoid()}`,
         name: '',
         content,
         contentSource,

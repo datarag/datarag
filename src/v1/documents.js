@@ -9,6 +9,7 @@ const { addJob } = require('../queue');
 const logger = require('../logger');
 const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
 const { convertSource } = require('../helpers/converter');
+const { RESID_PREFIX_DOCUMENT } = require('../constants');
 
 const { Op } = db.Sequelize;
 
@@ -300,7 +301,7 @@ module.exports = (router) => {
       const fields = {
         OrganizationId: req.organization.id,
         DatasourceId: datasource.id,
-        resId: resId || `doc-${nanoid()}`,
+        resId: resId || `${RESID_PREFIX_DOCUMENT}${nanoid()}`,
         name: payload.name,
         content,
         contentSource,

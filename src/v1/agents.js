@@ -4,6 +4,7 @@ const { apiRoute, conflictResponse, notFoundResponse } = require('../helpers/res
 const { serializeAgent, serializeDatasource } = require('../helpers/serialize');
 const db = require('../db/models');
 const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
+const { RESID_PREFIX_AGENT } = require('../constants');
 
 const { Op } = db.Sequelize;
 
@@ -250,7 +251,7 @@ module.exports = (router) => {
 
       const agent = await db.Agent.create({
         OrganizationId: req.organization.id,
-        resId: `agnt-${nanoid()}`,
+        resId: `${RESID_PREFIX_AGENT}${nanoid()}`,
         name: payload.name,
         purpose: payload.purpose,
       });

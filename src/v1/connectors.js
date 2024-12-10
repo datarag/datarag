@@ -5,6 +5,7 @@ const { serializeConnector } = require('../helpers/serialize');
 const db = require('../db/models');
 const { convertToFunctionName, isSafeUrl } = require('../helpers/utils');
 const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
+const { RESID_PREFIX_CONNECTOR } = require('../constants');
 
 const { Op } = db.Sequelize;
 
@@ -310,7 +311,7 @@ module.exports = (router) => {
       const fields = {
         OrganizationId: req.organization.id,
         DatasourceId: datasource.id,
-        resId: resId || `conn-${nanoid()}`,
+        resId: resId || `${RESID_PREFIX_CONNECTOR}${nanoid()}`,
         name: payload.name,
         purpose: payload.purpose,
         endpoint: payload.endpoint,

@@ -4,6 +4,7 @@ const { apiRoute, conflictResponse, notFoundResponse } = require('../helpers/res
 const { serializeDatasource } = require('../helpers/serialize');
 const db = require('../db/models');
 const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
+const { RESID_PREFIX_DATASOURCE } = require('../constants');
 
 const { Op } = db.Sequelize;
 
@@ -252,7 +253,7 @@ module.exports = (router) => {
 
       const datasource = await db.Datasource.create({
         OrganizationId: req.organization.id,
-        resId: `dsrc-${nanoid()}`,
+        resId: `${RESID_PREFIX_DATASOURCE}${nanoid()}`,
         name: payload.name,
         purpose: payload.purpose,
       });

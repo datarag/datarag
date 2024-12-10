@@ -23,6 +23,8 @@ const {
   LLM_QUALITY_HIGH,
   LLM_CREATIVITY_HIGH,
   LLM_CREATIVITY_MEDIUM,
+  RESID_PREFIX_TURN,
+  RESID_PREFIX_CONVERSATION_DOCUMENT,
 } = require('../constants');
 const classifyQueryPrompt = require('../prompts/classifyQueryPrompt');
 const chatPrompt = require('../prompts/chatPrompt');
@@ -167,11 +169,16 @@ module.exports = (router) => {
   *               datasource_id:
   *                 type: string
   *                 example: 'help-center'
-  *                 description: The datasource id.
+  *                 description: |
+  *                   The datasource id or null if source is originating from conversation training.
   *               document_id:
   *                 type: string
   *                 example: 'help-center-article'
-  *                 description: The document id.
+  *                 description: |
+  *                   The document id or null if source is originating from conversation training.
+  *               metadata:
+  *                 type: object
+  *                 description: Document metadata or empty object
   *
   *     NewChatQuery:
   *       type: object
@@ -675,7 +682,7 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
         const knowledgeToPrompt = [];
         _.each(knowledgeBase, (entry) => {
           knowledgeToPrompt.push(_.pick(entry, ['id', 'text', 'chunk']));
-          knowledgeIdToSource[entry.id] = _.pick(entry, ['datasource_id', 'document_id']);
+          knowledgeIdToSource[entry.id] = _.pick(entry, ['datasource_id', 'document_id', 'metadata']);
           knowledgeDocumentIdHash[`${entry.datasource_id}/${entry.document_id}`] = true;
         });
 
@@ -755,10 +762,15 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
           finished: true,
           classification,
           confidence,
-          sources: _.uniqWith(
-            _.filter(sources, (source) => !!(source.datasource_id && source.document_id)),
-            _.isEqual,
-          ),
+          sources: _.map(_.uniqWith(sources, _.isEqual), (source) => {
+            if (!source.document_id
+              || source.document_id.indexOf(RESID_PREFIX_CONVERSATION_DOCUMENT) === 0
+            ) {
+              source.document_id = null;
+              source.datasource_id = null;
+            }
+            return source;
+          }),
         },
         meta: {
           model,
@@ -792,7 +804,7 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
           OrganizationId: conversation.OrganizationId,
           ApiKeyId: conversation.ApiKeyId,
           ConversationId: conversation.id,
-          resId: `turn-${nanoid()}`,
+          resId: `${RESID_PREFIX_TURN}${nanoid()}`,
           payload: finalResponse,
           metadata: payload.turn_metadata || {},
           tokens:
