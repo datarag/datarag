@@ -19,11 +19,17 @@ const { Op } = db.Sequelize;
 /**
  * Given an API request payload, find the relevant datasource ids
  *
- * @param {*} { organization, agentId, datasourceIds }
+ * @param {*} { organization, agentId, datasourceIds, conversationId }
  * @return {*}
  */
-async function findDatasourceIds({ organization, agentResId, datasourceResIds }) {
+async function findDatasourceIds({
+  organization,
+  agentResId,
+  datasourceResIds,
+  conversationResId,
+}) {
   const data = [];
+
   if (agentResId) {
     const agent = await db.Agent.findOne({
       where: {
@@ -31,14 +37,33 @@ async function findDatasourceIds({ organization, agentResId, datasourceResIds })
         resId: agentResId,
       },
     });
-    if (!agent) {
-      return;
+    if (agent) {
+      const datasources = await agent.getDatasources({
+        attributes: ['id'],
+      });
+      _.each(datasources, (model) => data.push(model.id));
     }
-    const datasources = await agent.getDatasources({
-      attributes: ['id'],
-    });
-    _.each(datasources, (model) => data.push(model.id));
   }
+
+  if (conversationResId) {
+    const conversation = await db.Conversation.findOne({
+      where: {
+        OrganizationId: organization.id,
+        resId: conversationResId,
+      },
+    });
+
+    if (conversation) {
+      const datasources = await organization.getDatasources({
+        where: {
+          ConversationId: conversation.id,
+        },
+        attributes: ['id'],
+      });
+      _.each(datasources, (model) => data.push(model.id));
+    }
+  }
+
   if (!_.isEmpty(datasourceResIds)) {
     const datasources = await organization.getDatasources({
       where: {

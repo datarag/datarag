@@ -33,4 +33,22 @@ describe('IndexDocument Worker', () => {
     expect(chunks.length).toBeGreaterThan(0);
     expect(chunks[0].content).toEqual('Hello world');
   });
+
+  it('should index with shallow knowledge', async () => {
+    await factory.document.update({
+      content: 'Hello world',
+      contentType: 'text',
+    });
+
+    await indexDocument({
+      document_id: factory.document.id,
+      knowledge: 'shallow',
+    });
+
+    waitWorker();
+
+    const chunks = await factory.document.getChunks();
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks[0].content).toEqual('Hello world');
+  });
 });

@@ -131,7 +131,7 @@ function flattenText(markdownText) {
  * @param {number} [chunkWindow=50]
  * @return {[]}
  */
-function chunkifyMarkdown(markDownText, chunkSize = 200, chunkWindow = 50) {
+function chunkifyMarkdown(markDownText, chunkSize = 400, chunkWindow = 50) {
   const chunks = [];
 
   function recursiveSplit(textBlock, headings, depth) {

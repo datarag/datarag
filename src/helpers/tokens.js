@@ -12,17 +12,6 @@ function hashToken(token, salt = config.get('secrets:api_token_salt')) {
   return crypto.createHash('sha256').update(`${salt}:${token}`).digest('hex');
 }
 
-/**
- * Generate a random hash
- *
- * @param {number} [length=6]
- * @return {String}
- */
-function generateRandomHash(length = 6) {
-  return crypto.randomBytes(length).toString('hex').slice(0, length);
-}
-
 module.exports = {
   hashToken,
-  generateRandomHash,
 };

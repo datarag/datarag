@@ -1,9 +1,10 @@
 const _ = require('lodash');
+const { nanoid } = require('nanoid');
 const { apiRoute, conflictResponse, notFoundResponse } = require('../helpers/responses');
 const { serializeAgent, serializeDatasource } = require('../helpers/serialize');
-const { generateRandomHash } = require('../helpers/tokens');
 const db = require('../db/models');
 const { SCOPE_DATA_READ, SCOPE_DATA_WRITE } = require('../scopes');
+const { RESID_PREFIX_AGENT } = require('../constants');
 
 const { Op } = db.Sequelize;
 
@@ -36,6 +37,27 @@ module.exports = (router) => {
   *           type: string
   *           example: '2024-11-20T06:50:31.958Z'
   *           description: Agent creation datetime
+  *
+  *     UpdateAgent:
+  *       type: object
+  *       properties:
+  *         id:
+  *           type: string
+  *           pattern: '^[a-zA-Z0-9_-]+$'
+  *           maxLength: 255
+  *           example: 'website-agent'
+  *           description: A unique agent id.
+  *         name:
+  *           type: string
+  *           example: 'Website'
+  *           description: The name of the agent.
+  *         purpose:
+  *           type: string
+  *           example: 'A customer support agent that can find information on helpcenter and blogs.'
+  *           description: |
+  *             What this agent is all about.
+  *             Make it as descriptive as possible, so that LLM has a good understanding
+  *             of the functionality of the agent.
   *
   *     NewAgent:
   *       type: object
@@ -229,7 +251,7 @@ module.exports = (router) => {
 
       const agent = await db.Agent.create({
         OrganizationId: req.organization.id,
-        resId: `agnt-${generateRandomHash()}`,
+        resId: `${RESID_PREFIX_AGENT}${nanoid()}`,
         name: payload.name,
         purpose: payload.purpose,
       });
@@ -327,7 +349,7 @@ module.exports = (router) => {
   *               - data
   *             properties:
   *               data:
-  *                 $ref: '#/components/schemas/Agent'
+  *                 $ref: '#/components/schemas/UpdateAgent'
   *     responses:
   *       '200':
   *         description: Agent updated
