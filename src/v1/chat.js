@@ -343,7 +343,7 @@ module.exports = (router) => {
       let conversation = null;
       let turns = [];
       let classification = 'other';
-      const sources = [];
+      let sources = [];
       let confidence = 0;
       let finalText = '';
       let model = '';
@@ -461,8 +461,8 @@ module.exports = (router) => {
         const newExtractedStream = extractResponse(fullStream);
         if (!newExtractedStream) return;
 
-        const chunk = `${newExtractedStream}`.replace(extractedStream, '');
-        extractedStream = `${newExtractedStream}`;
+        const chunk = newExtractedStream.substring(extractedStream.length);
+        extractedStream = newExtractedStream;
 
         const partial = {
           data: {
@@ -755,6 +755,23 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
         streamFn(cannedResponse);
       }
 
+      // Clean sources
+      sources = _.map(sources, (source) => {
+        if (!source.document_id
+          || source.document_id.indexOf(RESID_PREFIX_CONVERSATION_DOCUMENT) === 0
+        ) {
+          source.document_id = null;
+          source.datasource_id = null;
+        }
+        return source;
+      });
+      // Remove empty values
+      sources = _.filter(sources, (source) => {
+        return (source.document_id && source.datasource_id) || !_.isEmpty(source.metadata);
+      });
+      // Remove duplicates
+      sources = _.uniqWith(sources, _.isEqual);
+
       const finalResponse = {
         data: {
           message: finalText || cannedResponse,
@@ -762,15 +779,7 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
           finished: true,
           classification,
           confidence,
-          sources: _.map(_.uniqWith(sources, _.isEqual), (source) => {
-            if (!source.document_id
-              || source.document_id.indexOf(RESID_PREFIX_CONVERSATION_DOCUMENT) === 0
-            ) {
-              source.document_id = null;
-              source.datasource_id = null;
-            }
-            return source;
-          }),
+          sources,
         },
         meta: {
           model,
