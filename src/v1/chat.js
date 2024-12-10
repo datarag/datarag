@@ -700,24 +700,31 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
           });
         }
 
+        const instructionsPrompt = chatInstructions({
+          instructions: getInstructions(req.organization, payload),
+          cannedResponse: getCannedResponse(),
+        }).prompt;
+
+        const userPrompt = chatPrompt({
+          knowledgeBase,
+          conversationHistory,
+          query: payload.query,
+        }).prompt;
+
         const chatResponse = await chatStream({
           quality:
             classification === 'task' || !_.isEmpty(tools)
               ? LLM_QUALITY_HIGH
               : LLM_QUALITY_MEDIUM,
           messages: [{
-            role: 'system',
-            content: chatInstructions({
-              instructions: getInstructions(req.organization, payload),
-              cannedResponse: getCannedResponse(),
-            }).prompt,
-          }, {
             role: 'user',
-            content: chatPrompt({
-              knowledgeBase,
-              conversationHistory,
-              query: payload.query,
-            }).prompt,
+            content: `
+${instructionsPrompt}
+
+------------------------------------------------------
+
+${userPrompt}
+            `,
           }],
           tools,
           streamFn,
