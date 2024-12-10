@@ -455,14 +455,14 @@ module.exports = (router) => {
       let fullStream = '';
       let extractedStream = '';
       async function streamFn(text) {
-        if (!payload.stream) return;
+        if (!payload.stream || !text) return;
 
         fullStream += text;
         const newExtractedStream = extractResponse(fullStream);
         if (!newExtractedStream) return;
 
         const chunk = `${newExtractedStream}`.replace(extractedStream, '');
-        extractedStream = newExtractedStream;
+        extractedStream = `${newExtractedStream}`;
 
         const partial = {
           data: {
