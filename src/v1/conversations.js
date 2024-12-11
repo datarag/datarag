@@ -671,4 +671,68 @@ module.exports = (router) => {
       res.status(204).send();
     }),
   );
+
+  /**
+  * @swagger
+  * /v1/conversations/{conversation_id}/train:
+  *   delete:
+  *     tags:
+  *       - Generative AI
+  *     summary: Delete conversation training
+  *     description: |
+  *       Delete any prior conversation training
+  *
+  *       **API Scope: `chat`**
+  *     parameters:
+  *       - name: conversation_id
+  *         in: path
+  *         required: true
+  *         schema:
+  *           type: string
+  *     responses:
+  *       '204':
+  *         description: Conversation training deleted
+  *       '400':
+  *         description: Bad request
+  *         content:
+  *           application/json:
+  *             schema:
+  *               $ref: '#/components/schemas/BadRequest'
+  *       '401':
+  *         description: Unauthorized access
+  *         content:
+  *           application/json:
+  *             schema:
+  *               $ref: '#/components/schemas/UnauthorizedError'
+  *       '404':
+  *         description: Not found
+  *         content:
+  *           application/json:
+  *             schema:
+  *               $ref: '#/components/schemas/NotfoundError'
+  */
+  router.delete(
+    '/conversations/:conversation_id/train',
+    apiRoute(SCOPE_CHAT, async (req, res) => {
+      const conversation = await db.Conversation.findOne({
+        where: {
+          OrganizationId: req.organization.id,
+          ApiKeyId: req.apiKey.id,
+          resId: req.params.conversation_id,
+        },
+      });
+
+      if (!conversation) {
+        notFoundResponse(req, res);
+        return;
+      }
+
+      const datasources = await conversation.getDatasources();
+      for (let i = 0; i < datasources.length; i += 1) {
+        await datasources[i].destroy();
+      }
+
+      res.status(204).send();
+    }),
+  );
 };

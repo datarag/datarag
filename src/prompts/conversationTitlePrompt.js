@@ -1,6 +1,5 @@
 module.exports = ({ query }) => {
-  return {
-    prompt: `
+  return `
 You are an assistant that generates concise and descriptive titles for user conversations.
 Based on the user's input, create a JSON response with the title field reflecting the essence of the conversation.
 
@@ -24,6 +23,5 @@ Now, here is the new user query. Provide the JSON response:
 ---
 ${query}
 ---
-    `,
-  };
+  `;
 };

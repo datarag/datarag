@@ -582,4 +582,74 @@ describe('Conversations API', () => {
       });
     });
   });
+
+  describe('DELETE /v1/conversations/:conversation_id/train', () => {
+    it('should delete conversation training data', async () => {
+      const datasource = await db.Datasource.create({
+        ConversationId: factory.conversation.id,
+        OrganizationId: factory.organization.id,
+        resId: 'any',
+        name: 'foo',
+        purpose: 'bar',
+      });
+
+      const agent = supertest.agent(app);
+      const res = await agent
+        .delete(`/v1/conversations/${factory.conversation.resId}/train`)
+        .set('Authorization', `Bearer ${TOKEN}`);
+
+      expect(res.statusCode).toEqual(204);
+
+      // Verify datasource is deleted
+      const deletedDatasource = await db.Datasource.findOne({ where: { id: datasource.id } });
+      expect(deletedDatasource).toBeNull();
+    });
+
+    it('should return 404 for a non-existent conversation', async () => {
+      const agent = supertest.agent(app);
+      const res = await agent
+        .delete('/v1/conversations/non-existent/train')
+        .set('Authorization', `Bearer ${TOKEN}`);
+
+      expect(res.statusCode).toEqual(404);
+      expect(res.body).toEqual({
+        errors: ['Resource may have been deleted or not been created yet'],
+        message: 'Not found',
+      });
+    });
+
+    it('should handle unauthorized access', async () => {
+      const agent = supertest.agent(app);
+      const res = await agent
+        .delete(`/v1/conversations/${factory.conversation.resId}/train`)
+        .set('Authorization', 'Bearer invalid');
+
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toEqual({
+        errors: ['Authentication credentials are missing'],
+        message: 'Unauthorized',
+      });
+    });
+
+    it('should handle a conversation with no training data gracefully', async () => {
+      const conversation = await db.Conversation.create({
+        OrganizationId: factory.organization.id,
+        ApiKeyId: factory.apiKey.id,
+        resId: 'conversation-no-training',
+      });
+
+      const agent = supertest.agent(app);
+      const res = await agent
+        .delete(`/v1/conversations/${conversation.resId}/train`)
+        .set('Authorization', `Bearer ${TOKEN}`);
+
+      expect(res.statusCode).toEqual(204);
+
+      // No datasources should exist for this conversation
+      const datasources = await db.Datasource.findAll({
+        where: { ConversationId: conversation.id },
+      });
+      expect(datasources).toHaveLength(0);
+    });
+  });
 });

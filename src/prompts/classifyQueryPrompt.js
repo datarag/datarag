@@ -1,6 +1,5 @@
 module.exports = ({ query }) => {
-  return {
-    prompt: `
+  return `
 You are an advanced text classification system.
 Your job is to analyze user queries and classify them into one of three categories:
 1. "task": The query requests an action, creation, completion, or performance of a specific task.
@@ -23,6 +22,5 @@ Now, classify the following input query:
 ---
 ${query}
 ---
-    `,
-  };
+  `;
 };

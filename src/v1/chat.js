@@ -410,7 +410,7 @@ module.exports = (router) => {
           text: repurposeQueryPrompt({
             history,
             query: payload.query,
-          }).prompt,
+          }),
           creativity: LLM_CREATIVITY_MEDIUM,
           quality: LLM_QUALITY_MEDIUM,
         });
@@ -435,7 +435,7 @@ module.exports = (router) => {
 
       await (async () => {
         const inferenceResponse = await inference({
-          text: classifyQueryPrompt({ query: repurposedQuery }).prompt,
+          text: classifyQueryPrompt({ query: repurposedQuery }),
           creativity: LLM_CREATIVITY_NONE,
           quality: LLM_QUALITY_MEDIUM,
           json: true,
@@ -703,13 +703,13 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
         const instructionsPrompt = chatInstructions({
           instructions: getInstructions(req.organization, payload),
           cannedResponse: getCannedResponse(),
-        }).prompt;
+        });
 
         const userPrompt = chatPrompt({
           knowledgeBase,
           conversationHistory,
           query: payload.query,
-        }).prompt;
+        });
 
         const chatResponse = await chatStream({
           quality:
@@ -861,7 +861,7 @@ ${userPrompt}
   ${repurposedQuery}
   ${finalResponse.data.message}
                 `,
-              }).prompt,
+              }),
               creativity: LLM_CREATIVITY_HIGH,
               quality: LLM_QUALITY_MEDIUM,
               json: true,

@@ -4,7 +4,8 @@ const md5 = require('../helpers/md5');
 const db = require('../db/models');
 const registry = require('../registry');
 const { flattenText, cleanText } = require('../helpers/chunker');
-const { rerank } = require('../llms/cohere');
+const cohere = require('../llms/cohere');
+const openai = require('../llms/openai');
 const { fullTextSearch } = require('../agents/fullTextSearch');
 const { semanticSearch } = require('../agents/semanticSearch');
 const config = require('../config');
@@ -12,6 +13,8 @@ const logger = require('../logger');
 const { serializeDocument } = require('../helpers/serialize');
 const { TreeNode } = require('../helpers/treenode');
 const { createEmbeddings } = require('../agents/createEmbeddings');
+const hydePrompt = require('../prompts/hydePrompt');
+const { LLM_CREATIVITY_HIGH, LLM_QUALITY_MEDIUM } = require('../constants');
 
 const RERANK_CUTOFF = config.get('retrieval:rerank:cutoff');
 const { Op } = db.Sequelize;
@@ -133,6 +136,10 @@ async function retrieveChunks({
   let costUSD = 0;
   let chunks = [];
   const chunksMap = {};
+  let query;
+  let queryVector;
+  let hydeQuery;
+  let hydeVector;
 
   const retrieveRagLog = ragLog.addChild(new TreeNode({
     type: 'retrieval',
@@ -160,9 +167,30 @@ async function retrieveChunks({
   };
 
   // create a vector on the query
-  logger.debug('retrieveChunks', `Embedding query: ${prompt}`);
-  const { query, queryVector, costUSD: qCostUSD } = await prepareQuery(prompt);
-  costUSD += qCostUSD;
+  await Promise.all([
+    (async () => {
+      logger.debug('retrieveChunks', `Embedding query: ${prompt}`);
+      const response = await prepareQuery(prompt);
+      query = response.query;
+      queryVector = response.queryVector;
+      costUSD += response.costUSD;
+    })(),
+
+    (async () => {
+      const response = await openai.inference({
+        text: hydePrompt({ query: prompt }),
+        creativity: LLM_CREATIVITY_HIGH,
+        quality: LLM_QUALITY_MEDIUM,
+      });
+      costUSD += response.costUSD;
+
+      logger.debug('retrieveChunks', `Embedding HyDE: ${response.output}`);
+      const responseQuery = await prepareQuery(response.output, 'document');
+      hydeQuery = responseQuery.query;
+      hydeVector = responseQuery.queryVector;
+      costUSD += responseQuery.costUSD;
+    })(),
+  ]);
 
   await Promise.all([
     // Full text search
@@ -212,20 +240,37 @@ async function retrieveChunks({
       }));
       searchRagLog.startMeasure();
 
-      const response = await semanticSearch({
-        query,
-        queryVector,
-        organizationId: organization.id,
-        datasourceIds,
-      });
-      costUSD += response.costUSD;
+      const semanticChunks = [];
+
+      await Promise.all([
+        (async () => {
+          const response = await semanticSearch({
+            query,
+            queryVector,
+            organizationId: organization.id,
+            datasourceIds,
+          });
+          costUSD += response.costUSD;
+          semanticChunks.push(...response.data);
+        })(),
+        (async () => {
+          const response = await semanticSearch({
+            query: hydeQuery,
+            queryVector: hydeVector,
+            organizationId: organization.id,
+            datasourceIds,
+          });
+          costUSD += response.costUSD;
+          semanticChunks.push(...response.data);
+        })(),
+      ]);
 
       searchRagLog.endMeasure();
 
-      logger.debug('retrieveChunks', `Semantic search yield ${response.data.length} results`);
+      logger.debug('retrieveChunks', `Semantic search yield ${semanticChunks.length} results`);
 
       // Add regular chunks
-      const regularChunks = _.filter(response.data, (chunk) => chunk.type === 'chunk');
+      const regularChunks = _.filter(semanticChunks, (chunk) => chunk.type === 'chunk');
       const addedChunks = addUniqueChunks(regularChunks);
 
       // Register Rag Log response
@@ -242,7 +287,7 @@ async function retrieveChunks({
       await Promise.all([
         // Process question bank
         (async () => {
-          const questionChunks = _.filter(response.data, (chunk) => chunk.type === 'question');
+          const questionChunks = _.filter(semanticChunks, (chunk) => chunk.type === 'question');
           if (_.isEmpty(questionChunks)) return;
 
           _.each(questionChunks, (qChunk) => {
@@ -305,7 +350,7 @@ async function retrieveChunks({
         })(),
         // Process summaries
         (async () => {
-          const summaryChunks = _.filter(response.data, (chunk) => chunk.type === 'summary');
+          const summaryChunks = _.filter(semanticChunks, (chunk) => chunk.type === 'summary');
           if (_.isEmpty(summaryChunks)) return;
 
           _.each(summaryChunks, (sChunk) => {
@@ -379,8 +424,8 @@ async function retrieveChunks({
   }));
   rerankRagLog.startMeasure();
 
-  const rerankResponse = await rerank({
-    query,
+  const rerankResponse = await cohere.rerank({
+    query: `${prompt}`,
     chunks,
     cutoff: RERANK_CUTOFF,
   });
