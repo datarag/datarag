@@ -30,7 +30,5 @@ User query:
 ${query}
   `;
 
-  return {
-    prompt,
-  };
+  return prompt;
 };

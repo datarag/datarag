@@ -224,8 +224,6 @@ function chunkifyMarkdown(markDownText, chunkSize = 400, chunkWindow = 50) {
   let cleanMarkDownText = markDownText;
   // Remove images
   cleanMarkDownText = cleanMarkDownText.replace(/!\[.*?\]\(.*?\)/g, '');
-  // Replace links with actual link text
-  cleanMarkDownText = cleanMarkDownText.replace(/\[(.*?)\]\(.*?\)/g, '$1');
 
   // Start recursive split
   recursiveSplit(cleanText(cleanMarkDownText), [], 1);

@@ -35,7 +35,5 @@ module.exports = ({
   prompt.push('Now answer this user query by following your instructions:');
   prompt.push(query);
 
-  return {
-    prompt: prompt.join('\n'),
-  };
+  return prompt.join('\n');
 };
