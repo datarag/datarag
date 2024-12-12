@@ -21,10 +21,10 @@ const COHERE_CLIENT_CONFIG = {
   token: config.get('secrets:cohere_api_key'),
 };
 const COHERE_CLIENT_REQUEST_OPTIONS = {
-  timeoutInSeconds: 60,
+  timeoutInSeconds: 30,
 };
 
-const MAX_RETRIES = 10;
+const MAX_RETRIES = 3;
 
 /**
  * Get the model used for embeddings generation

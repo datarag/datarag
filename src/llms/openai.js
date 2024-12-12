@@ -13,7 +13,7 @@ const {
 } = require('../constants');
 
 const OPENAI_API_KEY = config.get('secrets:openai_api_key');
-const MAX_RETRIES = 10;
+const MAX_RETRIES = 3;
 
 // Model order for summarizing and
 const PROCESSING_MODELS = [
@@ -206,7 +206,7 @@ async function chatStream({
   if (!_.isEmpty(tools)) {
     runner = await client.beta.chat.completions.runTools({
       model,
-      temperature: 0.2,
+      temperature: 0.3,
       stream: true,
       stream_options: {
         include_usage: true,
@@ -218,7 +218,7 @@ async function chatStream({
   } else {
     runner = await client.beta.chat.completions.stream({
       model,
-      temperature: 0.2,
+      temperature: 0.3,
       stream: true,
       stream_options: {
         include_usage: true,

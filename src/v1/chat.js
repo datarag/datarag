@@ -199,6 +199,12 @@ module.exports = (router) => {
   *             maxLength: 255
   *             example: 'website-agent'
   *           description: An array of datasource ids to be used in RAG.
+  *         conversation_id:
+  *           type: string
+  *           example: c5cb1ff3
+  *           description: |
+  *             Optionally associate this chat turn with
+  *             a Conversation to continue chat with memory.
   *         turn_context:
   *           type: array
   *           description: Additional custom knowledge context to be used in this turn.
@@ -214,20 +220,20 @@ module.exports = (router) => {
   *         turn_metadata:
   *           type: object
   *           description: Turn metadata object to be stored in conversation turn history.
-  *         query:
-  *           type: string
-  *           example: 'What is machine learning?'
-  *           description: User message.
   *         instructions:
   *           type: string
   *           example: 'You are a helpful assistant'
   *           description: LLM instructions.
-  *         conversation_id:
+  *         query:
   *           type: string
-  *           example: c5cb1ff3
+  *           example: 'What is machine learning?'
+  *           description: User message.
+  *         grounded_response:
+  *           type: boolean
+  *           example: false
+  *           default: true
   *           description: |
-  *             Optionally associate this chat turn with
-  *             a Conversation to continue chat with memory.
+  *             Whether the response should be fully grounded in facts from knowledge base or not.
   *         stream:
   *           type: boolean
   *           example: true
@@ -312,6 +318,10 @@ module.exports = (router) => {
   *                        type: string
   *                        description: The LLM model used for inference.
   *                        example: 'gpt-4o'
+  *                     answered:
+  *                        type: boolean
+  *                        example: true
+  *                        description: Whether the user query was answered or not.
   *                     transaction_id:
   *                        type: string
   *                        description: A transaction identifier.
@@ -347,6 +357,7 @@ module.exports = (router) => {
       let confidence = 0;
       let finalText = '';
       let model = '';
+      let answered = false;
 
       const log = (message) => {
         logger.info(`Chat / ${req.organization.resId} / ${uuid}`, message);
@@ -702,6 +713,7 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
 
         const instructionsPrompt = chatInstructions({
           instructions: getInstructions(req.organization, payload),
+          grounding: !!payload.grounded_response,
           cannedResponse: getCannedResponse(),
         });
 
@@ -737,6 +749,7 @@ ${userPrompt}
         try {
           const jsonResponse = JSON.parse(chatResponse.text);
           finalText = jsonResponse.response || finalText;
+          answered = !!jsonResponse.answered;
           // Find sources used to answer question
           const usedKnowledgeDocumentIdHash = {};
           _.each(jsonResponse.documents, (documentId) => {
@@ -790,6 +803,7 @@ ${userPrompt}
         },
         meta: {
           model,
+          answered,
           query: payload.query,
           repurposed_query: repurposedQuery,
           processing_time_ms: Date.now() - now,
