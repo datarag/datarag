@@ -5,7 +5,7 @@ const logger = require('../../logger');
 const config = require('../../config');
 const cohere = require('../../llms/cohere');
 const openai = require('../../llms/openai');
-const { countWords } = require('../../helpers/utils');
+const { countWords, trimTextToMaxWords } = require('../../helpers/utils');
 const { chunkifyMarkdown } = require('../../helpers/chunker');
 const { LLM_CREATIVITY_NONE, LLM_QUALITY_MEDIUM } = require('../../constants');
 const { createEmbeddings } = require('../../agents/createEmbeddings');
@@ -37,7 +37,7 @@ Example response:
 }
 
 ## Document:
-${text}
+${trimTextToMaxWords(text, 2000)}
   `;
 
   let completion;

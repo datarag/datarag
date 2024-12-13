@@ -1,4 +1,9 @@
-const { isSafeUrl, convertToFunctionName, trimString } = require('../src/helpers/utils');
+const {
+  isSafeUrl,
+  convertToFunctionName,
+  trimString,
+  cleanHtml,
+} = require('../src/helpers/utils');
 
 describe('Utility Functions', () => {
   describe('isSafeUrl', () => {
@@ -89,6 +94,62 @@ describe('Utility Functions', () => {
 
     it('handles special characters in the string', () => {
       expect(trimString('Special!@#$%^&*()', 7)).toBe('Special');
+    });
+  });
+
+  describe('cleanHtml', () => {
+    it('removes header, footer, nav, and iframe elements', () => {
+      const htmlContent = '<header>Header</header><nav>Nav</nav><iframe></iframe><div>Content</div>';
+      const result = cleanHtml(htmlContent);
+      expect(result).toBe('<div>Content</div>');
+    });
+
+    it('removes all attributes except href', () => {
+      const htmlContent = '<div id="test" class="example" href="keep">Content</div>';
+      const result = cleanHtml(htmlContent);
+      expect(result).toBe('<div href="keep">Content</div>');
+    });
+
+    it('removes empty elements', () => {
+      const htmlContent = '<div></div><span> </span><p>Content</p>';
+      const result = cleanHtml(htmlContent);
+      expect(result).toBe('<p>Content</p>');
+    });
+
+    it('removes comments', () => {
+      const htmlContent = '<div><!-- Comment --></div>';
+      const result = cleanHtml(htmlContent);
+      expect(result).not.toContain('<!-- Comment -->');
+    });
+
+    it('cleans anchor text and converts invalid hrefs to spans', () => {
+      const htmlContent = '<a href="javascript:void(0)">Click me</a>';
+      const result = cleanHtml(htmlContent);
+      expect(result).toBe('<span>Click me</span>');
+    });
+
+    it('removes anchors with empty text', () => {
+      const htmlContent = '<a href="https://example.com"></a>';
+      const result = cleanHtml(htmlContent);
+      expect(result).toBe('');
+    });
+
+    it('handles nested elements properly', () => {
+      const htmlContent = '<div><header>Header</header><p>Text</p></div>';
+      const result = cleanHtml(htmlContent);
+      expect(result).toBe('<div><p>Text</p></div>');
+    });
+
+    it('keeps valid anchor elements intact', () => {
+      const htmlContent = '<a href="https://example.com">Visit</a>';
+      const result = cleanHtml(htmlContent);
+      expect(result).toBe('<a href="https://example.com">Visit</a>');
+    });
+
+    it('trims and normalizes anchor text', () => {
+      const htmlContent = '<a href="https://example.com">   Text   \n\n with   spaces\n </a>';
+      const result = cleanHtml(htmlContent);
+      expect(result).toBe('<a href="https://example.com">Text with spaces</a>');
     });
   });
 });

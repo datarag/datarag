@@ -32,6 +32,57 @@ function isSafeUrl(url) {
   });
 }
 
+function cleanHtml(htmlContent) {
+  // Load the HTML content into Cheerio
+  const $ = cheerio.load(htmlContent);
+
+  // Remove all header, footer, nav, and iframe elements
+  $('svg, nav, .nav, .navigation, header, footer, .footer, aside, script, style, img, iframe').remove();
+
+  // Remove all attributes from remaining elements except 'href'
+  $('*').each((_, element) => {
+    const attributes = Object.keys(element.attribs);
+    attributes.forEach((attr) => {
+      if (attr.toLowerCase() !== 'href') {
+        $(element).removeAttr(attr);
+      }
+    });
+  });
+
+  // Remove empty elements recursively
+  $('*').each((_, element) => {
+    if (!$(element).text().trim() && $(element).children().length === 0) {
+      $(element).remove();
+    }
+  });
+
+  // Remove all comments
+  $('*').contents().each((_, node) => {
+    if (node.type === 'comment') {
+      $(node).remove();
+    }
+  });
+
+  // Clean anchor text and handle invalid hrefs
+  $('a').each((_, anchor) => {
+    const $anchor = $(anchor);
+    const href = $anchor.attr('href');
+    const invalidHref = !href || /^(javascript:|void\(\)|#|data:|mailto:|tel:|\s*$)/i.test(href.trim());
+
+    if ($anchor.text().trim()) {
+      $anchor.text($anchor.text().replace(/\s+/g, ' ').trim());
+    }
+
+    if (!$anchor.text().trim()) {
+      $anchor.remove();
+    } else if (invalidHref) {
+      $anchor.replaceWith(`<span>${$anchor.text()}</span>`);
+    }
+  });
+
+  return $('body').html();
+}
+
 /**
  * Get and clean HTML from URL
  *
@@ -44,23 +95,8 @@ async function fetchAndCleanHtml(url) {
   }
 
   const response = await axios.get(url);
-  const htmlContent = response.data;
 
-  // Load the HTML content into Cheerio
-  const $ = cheerio.load(htmlContent);
-
-  // Remove unnecessary elements (adjust selectors as needed)
-  $('svg, nav, .nav, .navigation, header, footer, .footer, aside, script, style, img, iframe').remove();
-
-  // Remove empty elements
-  $('body').find('*').filter(function () {
-    return ($(this).text().trim()) === '';
-  }).remove();
-
-  // Extract the main content (you may need to adjust this for different sites)
-  const mainContent = $('main').length ? $('main').html() : $('body').html();
-
-  return mainContent;
+  return cleanHtml(response.data);
 }
 
 /**
@@ -73,6 +109,13 @@ function countWords(str) {
   return str.trim().split(/\s+/).length;
 }
 
+/**
+ * Trim text up to max words
+ *
+ * @param {*} text
+ * @param {*} maxWords
+ * @return {*}
+ */
 function trimTextToMaxWords(text, maxWords) {
   // Split the text into words
   const words = text.split(' ');
@@ -186,6 +229,7 @@ function trimString(str, maxLength) {
 
 module.exports = {
   isSafeUrl,
+  cleanHtml,
   fetchAndCleanHtml,
   countWords,
   trimTextToMaxWords,
