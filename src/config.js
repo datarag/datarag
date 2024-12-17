@@ -58,9 +58,6 @@ nconf.set('retrieval:rerank:cutoff', getEnvironment('DATARAG_RETRIEVAL_RERANK_CU
 // Max tokens to use when embedding conversation history in chat
 nconf.set('chat:history:maxtokens', getEnvironment('DATARAG_CHAT_HISTORY_MAXTOKENS', 512));
 
-// Max tokens to use when repurposing user query in chat
-nconf.set('chat:repurpose:maxtokens', getEnvironment('DATARAG_CHAT_REPURPOSE_MAXTOKENS', 512));
-
 // Max tokens to use when adding custom instructions in chat
 nconf.set('chat:instructions:maxtokens', getEnvironment('DATARAG_CHAT_INSTRUCTIONS_MAXTOKENS', 1024));
 

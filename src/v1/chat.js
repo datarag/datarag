@@ -22,18 +22,15 @@ const {
   LLM_QUALITY_MEDIUM,
   LLM_QUALITY_HIGH,
   LLM_CREATIVITY_HIGH,
-  LLM_CREATIVITY_MEDIUM,
   RESID_PREFIX_TURN,
   RESID_PREFIX_CONVERSATION_DOCUMENT,
 } = require('../constants');
 const classifyQueryPrompt = require('../prompts/classifyQueryPrompt');
 const chatPrompt = require('../prompts/chatPrompt');
 const conversationTitlePrompt = require('../prompts/conversationTitlePrompt');
-const repurposeQueryPrompt = require('../prompts/repurposeQueryPrompt');
 const chatInstructions = require('../prompts/chatInstructions');
 
 const { Op } = db.Sequelize;
-const REPURPOSE_MAXTOKENS = config.get('chat:repurpose:maxtokens');
 const HISTORY_MAXTOKENS = config.get('chat:history:maxtokens');
 const INSTRUCTIONS_MAXTOKENS = config.get('chat:instructions:maxtokens');
 const TURN_CONTEXT_MAXTOKENS = config.get('chat:turn:context:maxtokens');
@@ -310,10 +307,6 @@ module.exports = (router) => {
   *                        type: string
   *                        description: The initial requested query.
   *                        example: 'What is machine learning?'
-  *                     repurposed_query:
-  *                        type: string
-  *                        description: Repurposed query using conversation history as context.
-  *                        example: 'What is machine learning the Generative space?'
   *                     model:
   *                        type: string
   *                        description: The LLM model used for inference.
@@ -346,8 +339,11 @@ module.exports = (router) => {
       const uuid = nanoid();
       const cannedResponse = getCannedResponse();
       const payload = req.body.data;
+
       let queryCostUSD = 0;
-      let repurposedQuery = payload.query;
+      const knowledgeIdToSource = {};
+      const knowledgeDocumentIdHash = {};
+      const knowledgeToPrompt = [];
 
       let datasourceIds = [];
       let conversation = null;
@@ -359,8 +355,40 @@ module.exports = (router) => {
       let model = '';
       let answered = false;
 
+      // Log chat message
       const log = (message) => {
         logger.info(`Chat / ${req.organization.resId} / ${uuid}`, message);
+      };
+
+      // Given a knowledge base array of object, register them for source reference
+      // in the final response, and format them to be consumed as LLM function response
+      // Structure:
+      // [{
+      //   id, text, chunk, datasource_id, document_id, metadata
+      // }]
+      const formatKnowledgeBase = (data) => {
+        const response = [];
+
+        _.each(data, (entry) => {
+          // Hash reference
+          knowledgeToPrompt.push(_.pick(entry, ['id', 'text', 'chunk']));
+          knowledgeIdToSource[entry.id] = _.pick(entry, ['datasource_id', 'document_id', 'metadata']);
+          knowledgeDocumentIdHash[`${entry.datasource_id}/${entry.document_id}`] = true;
+
+          // Format response
+          let content = `Document id: ${entry.id}\n\n`;
+          _.each(entry.metadata, (value, key) => {
+            content += `${key}: ${_.isString(value) ? value : JSON.stringify(value)}\n\n`;
+          });
+          content += `${entry.text}`;
+
+          response.push({
+            document_id: entry.id,
+            content,
+          });
+        });
+
+        return response;
       };
 
       // Defaults
@@ -393,67 +421,40 @@ module.exports = (router) => {
           badRequestResponse(req, res, 'Invalid conversation_id');
           return;
         }
-
-        turns = await conversation.getTurns({
-          order: [['createdAt', 'ASC']],
-        });
       }
 
-      // --------------- Reformulate query ---------------
+      await Promise.all([
+        // Turns
+        (async () => {
+          if (conversation) {
+            turns = await conversation.getTurns({
+              order: [['createdAt', 'ASC']],
+            });
+          }
+        })(),
 
-      await (async () => {
-        if (_.isEmpty(turns)) return;
-
-        const history = [];
-
-        // Add previous turns
-        let turnTokens = 0;
-        _.each(_.reverse(turns), (turn) => {
-          if (turnTokens >= REPURPOSE_MAXTOKENS) return;
-          turnTokens += turn.tokens;
-          history.unshift({
-            user: turn.payload.meta.query,
-            assistant: turn.payload.data.message,
+        // Datasources
+        (async () => {
+          datasourceIds = await findDatasourceIds({
+            organization: req.organization,
+            agentResId: payload.agent_id,
+            datasourceResIds: payload.datasource_ids,
+            conversationResId: payload.conversation_id,
           });
-        });
+        })(),
 
-        const inferenceResponse = await inference({
-          text: repurposeQueryPrompt({
-            history,
-            query: payload.query,
-          }),
-          creativity: LLM_CREATIVITY_MEDIUM,
-          quality: LLM_QUALITY_MEDIUM,
-        });
-        queryCostUSD += inferenceResponse.costUSD;
-        repurposedQuery = inferenceResponse.output || repurposedQuery;
-
-        log(`Repurposed query: ${payload.query} -> ${repurposedQuery}`);
-      })();
-
-      // --------------- Datasources ---------------
-
-      await (async () => {
-        datasourceIds = await findDatasourceIds({
-          organization: req.organization,
-          agentResId: payload.agent_id,
-          datasourceResIds: payload.datasource_ids,
-          conversationResId: payload.conversation_id,
-        });
-      })();
-
-      // --------------- Query classification ---------------
-
-      await (async () => {
-        const inferenceResponse = await inference({
-          text: classifyQueryPrompt({ query: repurposedQuery }),
-          creativity: LLM_CREATIVITY_NONE,
-          quality: LLM_QUALITY_MEDIUM,
-          json: true,
-        });
-        queryCostUSD += inferenceResponse.costUSD;
-        classification = inferenceResponse.output.classification || 'other';
-      })();
+        // Classification
+        (async () => {
+          const inferenceResponse = await inference({
+            text: classifyQueryPrompt({ query: payload.query }),
+            creativity: LLM_CREATIVITY_NONE,
+            quality: LLM_QUALITY_MEDIUM,
+            json: true,
+          });
+          queryCostUSD += inferenceResponse.costUSD;
+          classification = inferenceResponse.output.classification || 'other';
+        })(),
+      ]);
 
       // --------------- Stream management ---------------
 
@@ -494,7 +495,7 @@ module.exports = (router) => {
 
       // --------------- LLM Chat ---------------
 
-      if (classification !== 'other') {
+      await (async () => {
         // Setup OpenAI tools
         const connectorAuthHeader = req.headers['x-connector-auth'];
         const toolNameHash = {};
@@ -618,14 +619,68 @@ module.exports = (router) => {
           });
         }));
 
-        const retrieveFromKnowledgeBase = async () => {
-          logger.debug('datasource:call', 'retrieveFromKnowledgeBase');
-          logger.debug('datasource:query', repurposedQuery);
+        if (!_.isEmpty(searchDataSourceIds)) {
+          const searchKnowledgeBase = async (args) => {
+            logger.debug('datasource:call', 'searchKnowledgeBase');
+            logger.debug('datasource:query', args.query);
 
-          const knowledge = [];
+            if (!args.query) return [];
 
-          // Add custom knowledge
-          if (!_.isEmpty(payload.turn_context)) {
+            const { costUSD, chunks } = await retrieveChunks({
+              organization: req.organization,
+              datasourceIds: searchDataSourceIds,
+              prompt: args.query,
+              maxTokens: payload.max_tokens,
+              maxChars: payload.max_chars,
+              maxChunks: payload.max_chunks,
+              ragLog,
+            });
+            queryCostUSD += costUSD;
+            logger.debug('datasource:response', `${chunks.length} retrieved`);
+            log(`Searching knowledge base yield ${chunks.length} chunks`);
+
+            // Add to knowledge
+            const knowledge = [];
+            _.each(chunks, (chunk) => {
+              knowledge.push({
+                id: nanoid(),
+                text: chunk.text,
+                metadata: chunk.metadata || {},
+                datasource_id: chunk.datasource_id,
+                document_id: chunk.document_id,
+              });
+            });
+
+            return formatKnowledgeBase(knowledge);
+          };
+
+          tools.push({
+            type: 'function',
+            function: {
+              function: searchKnowledgeBase,
+              description: 'Given a user query, search and retrieve related information from your knowledge base',
+              parse: JSON.parse,
+              parameters: {
+                type: 'object',
+                properties: {
+                  query: {
+                    type: 'string',
+                    description: 'The user query to be used for searching, reformulated under the context of the conversation history',
+                  },
+                },
+                required: ['query'],
+                additionalProperties: false,
+              },
+            },
+          });
+        }
+
+        if (!_.isEmpty(payload.turn_context)) {
+          const getCurrentPage = async () => {
+            logger.debug('datasource:call', 'getCurrentPage');
+
+            const knowledge = [];
+
             // Limit budgets
             let maxTokens = TURN_CONTEXT_MAXTOKENS;
             _.each(payload.turn_context, (context) => {
@@ -651,51 +706,21 @@ module.exports = (router) => {
                 document_id: '',
               });
             });
-          }
 
-          if (!repurposedQuery || _.isEmpty(searchDataSourceIds)) {
-            return knowledge;
-          }
+            return formatKnowledgeBase(knowledge);
+          };
 
-          const { costUSD, chunks } = await retrieveChunks({
-            organization: req.organization,
-            datasourceIds: searchDataSourceIds,
-            prompt: `
-${payload.query}
-${payload.query !== repurposedQuery ? repurposedQuery : ''}
-            `.trim(),
-            maxTokens: payload.max_tokens,
-            maxChars: payload.max_chars,
-            maxChunks: payload.max_chunks,
-            ragLog,
+          tools.push({
+            type: 'function',
+            function: {
+              function: getCurrentPage,
+              description: 'Get the current content the user is viewing, such as an active web page in a Chrome tab.',
+              parse: JSON.parse,
+            },
           });
-          queryCostUSD += costUSD;
-          logger.debug('datasource:response', `${chunks.length} retrieved`);
-          log(`Searching knowledge base yield ${chunks.length} chunks`);
-          // Add to knowledge
-          _.each(chunks, (chunk) => {
-            knowledge.push({
-              id: nanoid(),
-              text: chunk.text,
-              metadata: chunk.metadata || {},
-              datasource_id: chunk.datasource_id,
-              document_id: chunk.document_id,
-            });
-          });
-          return knowledge;
-        };
+        }
 
         // --------------- Messages ---------------
-
-        const knowledgeBase = await retrieveFromKnowledgeBase();
-        const knowledgeIdToSource = {};
-        const knowledgeDocumentIdHash = {};
-        const knowledgeToPrompt = [];
-        _.each(knowledgeBase, (entry) => {
-          knowledgeToPrompt.push(_.pick(entry, ['id', 'text', 'chunk']));
-          knowledgeIdToSource[entry.id] = _.pick(entry, ['datasource_id', 'document_id', 'metadata']);
-          knowledgeDocumentIdHash[`${entry.datasource_id}/${entry.document_id}`] = true;
-        });
 
         // Add conversation history
         const conversationHistory = [];
@@ -705,27 +730,28 @@ ${payload.query !== repurposedQuery ? repurposedQuery : ''}
             if (turnTokens >= HISTORY_MAXTOKENS) return;
             turnTokens += turn.tokens;
             conversationHistory.unshift({
-              user: turn.payload.meta.repurposed_query,
+              user: turn.payload.meta.query,
               assistant: turn.payload.data.message,
             });
           });
         }
 
+        // Generate instructions prompt
         const instructionsPrompt = chatInstructions({
           instructions: getInstructions(req.organization, payload),
           grounding: !!payload.grounded_response,
           cannedResponse: getCannedResponse(),
         });
 
+        // Generate user prompt
         const userPrompt = chatPrompt({
-          knowledgeBase,
           conversationHistory,
           query: payload.query,
         });
 
         const chatResponse = await chatStream({
           quality:
-            classification === 'task' || !_.isEmpty(tools)
+            classification === 'task'
               ? LLM_QUALITY_HIGH
               : LLM_QUALITY_MEDIUM,
           messages: [{
@@ -769,7 +795,7 @@ ${userPrompt}
         } catch (err) {
           // no-op
         }
-      }
+      })();
 
       if (!finalText) {
         streamFn(cannedResponse);
@@ -805,7 +831,6 @@ ${userPrompt}
           model,
           answered,
           query: payload.query,
-          repurposed_query: repurposedQuery,
           processing_time_ms: Date.now() - now,
           transaction_id: req.transactionId,
         },
@@ -872,7 +897,7 @@ ${userPrompt}
             const titleResponse = await inference({
               text: conversationTitlePrompt({
                 query: `
-  ${repurposedQuery}
+  ${payload.query}
   ${finalResponse.data.message}
                 `,
               }),
