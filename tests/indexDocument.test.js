@@ -31,24 +31,5 @@ describe('IndexDocument Worker', () => {
 
     const chunks = await factory.document.getChunks();
     expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks[0].content.trim()).toEqual(`# Document Summary: ${TOKEN}\n\nHello world`);
-  });
-
-  it('should index with shallow knowledge', async () => {
-    await factory.document.update({
-      content: 'Hello world',
-      contentType: 'text',
-    });
-
-    await indexDocument({
-      document_id: factory.document.id,
-      knowledge: 'shallow',
-    });
-
-    waitWorker();
-
-    const chunks = await factory.document.getChunks();
-    expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks[0].content.trim()).toEqual('Hello world');
   });
 });

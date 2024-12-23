@@ -270,8 +270,7 @@ async function retrieveChunks({
       logger.debug('retrieveChunks', `Semantic search yield ${semanticChunks.length} results`);
 
       // Add regular chunks
-      const regularChunks = _.filter(semanticChunks, (chunk) => (chunk.type === 'chunk' || chunk.type === 'summary'));
-      const addedChunks = addUniqueChunks(regularChunks);
+      const addedChunks = addUniqueChunks(semanticChunks);
 
       // Register Rag Log response
       _.each(addedChunks, (chunk) => {
@@ -284,128 +283,59 @@ async function retrieveChunks({
         }));
       });
 
-      await Promise.all([
-        // Process question bank
-        (async () => {
-          const questionChunks = _.filter(semanticChunks, (chunk) => chunk.type === 'question');
-          if (_.isEmpty(questionChunks)) return;
+      // Process relations
+      const relations = await db.Relation.findAll({
+        where: {
+          OrganizationId: organization.id,
+          DatasourceId: {
+            [Op.in]: datasourceIds,
+          },
+          ChunkId: {
+            [Op.in]: _.map(semanticChunks, (chunk) => chunk.id),
+          },
+        },
+      });
 
-          _.each(questionChunks, (qChunk) => {
-            logger.debug('retrieveChunks', `Question: ${qChunk.content}`);
-          });
+      const relChunks = await db.Chunk.findAll({
+        where: {
+          OrganizationId: organization.id,
+          DatasourceId: {
+            [Op.in]: datasourceIds,
+          },
+          id: {
+            [Op.in]: _.map(relations, (relation) => relation.TargetChunkId),
+          },
+        },
+      });
 
-          const relations = await db.Relation.findAll({
-            where: {
-              OrganizationId: organization.id,
-              DatasourceId: {
-                [Op.in]: datasourceIds,
-              },
-              ChunkId: {
-                [Op.in]: _.map(questionChunks, (chunk) => chunk.id),
-              },
-            },
-          });
+      const relAddedChunks = addUniqueChunks(relChunks);
 
-          const relChunks = await db.Chunk.findAll({
-            where: {
-              OrganizationId: organization.id,
-              DatasourceId: {
-                [Op.in]: datasourceIds,
-              },
-              id: {
-                [Op.in]: _.map(relations, (relation) => relation.TargetChunkId),
-              },
-              type: 'chunk',
-            },
-          });
+      // Register Rag log
+      const relAddedChunksHashIds = {};
+      _.each(relAddedChunks, (chunk) => {
+        relAddedChunksHashIds[chunk.id] = true;
+      });
 
-          const relAddedChunks = addUniqueChunks(relChunks);
-
-          // Register Rag log
-          const relAddedChunksHashIds = {};
-          _.each(relAddedChunks, (chunk) => {
-            relAddedChunksHashIds[chunk.id] = true;
-          });
-
-          const relationHashMap = {};
-          _.each(relations, (relation) => {
-            if (!relAddedChunksHashIds[relation.TargetChunkId]) return;
-            relationHashMap[relation.ChunkId] = relation.TargetChunkId;
-          });
-          _.each(questionChunks, (questionChunk) => {
-            if (!relationHashMap[questionChunk.id]) return;
-            searchRagLog.addChild(new TreeNode({
-              type: 'question',
-              similarity: questionChunk.similarity,
-              chunk_ref: questionChunk.id,
-              datasource_ref: questionChunk.DatasourceId,
-              document_ref: questionChunk.DocumentId,
-            })).addChild(new TreeNode({
-              type: 'chunk',
-              chunk_ref: relationHashMap[questionChunk.id],
-              datasource_ref: questionChunk.DatasourceId,
-              document_ref: questionChunk.DocumentId,
-            }));
-          });
-        })(),
-        // Process summaries
-        (async () => {
-          const summaryChunks = _.filter(semanticChunks, (chunk) => chunk.type === 'summary');
-          if (_.isEmpty(summaryChunks)) return;
-
-          _.each(summaryChunks, (sChunk) => {
-            logger.debug('retrieveChunks', `Summary: ${sChunk.content}`);
-          });
-
-          const relChunks = await db.Chunk.findAll({
-            where: {
-              OrganizationId: organization.id,
-              DatasourceId: {
-                [Op.in]: datasourceIds,
-              },
-              DocumentId: {
-                [Op.in]: _.map(summaryChunks, (relation) => relation.DocumentId),
-              },
-              type: 'chunk',
-            },
-          });
-
-          const relAddedChunks = addUniqueChunks(relChunks);
-
-          // Register Rag log
-          const relAddedChunksHashIds = {};
-          _.each(relAddedChunks, (chunk) => {
-            relAddedChunksHashIds[chunk.id] = true;
-          });
-
-          _.each(summaryChunks, (summaryChunk) => {
-            const sumChunks = _.filter(
-              relChunks,
-              (chunk) => (
-                chunk.DocumentId === summaryChunk.DocumentId
-                && relAddedChunksHashIds[chunk.id]
-              ),
-            );
-            if (!_.isEmpty(sumChunks)) {
-              const summaryRagLog = searchRagLog.addChild(new TreeNode({
-                type: 'summary',
-                similarity: summaryChunk.similarity,
-                chunk_ref: summaryChunk.id,
-                datasource_ref: summaryChunk.DatasourceId,
-                document_ref: summaryChunk.DocumentId,
-              }));
-              _.each(sumChunks, (chunk) => {
-                summaryRagLog.addChild(new TreeNode({
-                  type: 'chunk',
-                  chunk_ref: chunk.id,
-                  datasource_ref: chunk.DatasourceId,
-                  document_ref: chunk.DocumentId,
-                }));
-              });
-            }
-          });
-        })(),
-      ]);
+      const relationHashMap = {};
+      _.each(relations, (relation) => {
+        if (!relAddedChunksHashIds[relation.TargetChunkId]) return;
+        relationHashMap[relation.ChunkId] = relation.TargetChunkId;
+      });
+      _.each(semanticChunks, (relChunk) => {
+        if (!relationHashMap[relChunk.id]) return;
+        searchRagLog.addChild(new TreeNode({
+          type: relChunk.type,
+          similarity: relChunk.similarity,
+          chunk_ref: relChunk.id,
+          datasource_ref: relChunk.DatasourceId,
+          document_ref: relChunk.DocumentId,
+        })).addChild(new TreeNode({
+          type: relChunk.type,
+          chunk_ref: relationHashMap[relChunk.id],
+          datasource_ref: relChunk.DatasourceId,
+          document_ref: relChunk.DocumentId,
+        }));
+      });
     })(),
   ]);
 
