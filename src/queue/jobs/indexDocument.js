@@ -9,6 +9,8 @@ const { countWords, trimTextToMaxWords } = require('../../helpers/utils');
 const { chunkifyMarkdown } = require('../../helpers/chunker');
 const { LLM_CREATIVITY_NONE, LLM_QUALITY_MEDIUM } = require('../../constants');
 const { createEmbeddings } = require('../../agents/createEmbeddings');
+const summarizePrompt = require('../../prompts/summarizePrompt');
+const questionBankPrompt = require('../../prompts/questionBankPrompt');
 
 const PARALLEL_SIZE = 10;
 
@@ -19,26 +21,10 @@ const PARALLEL_SIZE = 10;
  * @return {String}
  */
 async function summarize({ text, maxWords }) {
-  const prompt = `
-  ## Instructions
-
-1. You are provided with a document that needs to be summarized.
-2. Your task is to create a concise summary of the document, capturing its key points and main ideas in up to ${maxWords} words.
-3. This summary will be used for embeddings and similarity search purposes.
-4. Ensure that the summary is clear, accurate, and retains the essence of the original document.
-5. After the summary is generated, also create a sort couple of sentences text that summarizes the summary, called context.
-
-Response in JSON format.
-
-Example response:
-{
-  "summary": "This is summary of the document",
-  "context": "This is a short summary of the summary"
-}
-
-## Document:
-${trimTextToMaxWords(text, 2000)}
-  `;
+  const prompt = summarizePrompt({
+    maxWords,
+    text: trimTextToMaxWords(text, 2000),
+  });
 
   let completion;
 
@@ -80,32 +66,7 @@ ${trimTextToMaxWords(text, 2000)}
  * @return {String}
  */
 async function questionBank({ text }) {
-  const prompt = `
-You are an AI designed to create a knowledge base by generating questions based on the provided document.
-Given the document below, return questions that can be directly answered using the information from the document.
-Ensure the questions are clear, concise, and relevant to the key details in the document, and return them in a JSON array format.
-
-# Instructions:
-1. Read the provided document carefully.
-2. Identify key details, facts, and concepts.
-3. Formulate questions based on these key details. Each question should be answerable using the available information from the document only.
-4. Ensure the questions cover a range of information from the text, including but not limited to definitions, explanations, dates, names, events, processes, and relationships.
-5. Do not refer to the "document" or "text" in the generated questions. Do not use these words.
-6. Return questions in a JSON array format.
-
-Example JSON reponse:
-{
-  "questions": [
-    "Question 1",
-    "Question 2",
-    "Question 3"
-  ]
-}
-
-Now, generate questions from the provided document:
-
-${text}
-  `;
+  const prompt = questionBankPrompt({ text });
 
   let completion;
 
@@ -201,6 +162,12 @@ async function indexDocument(payload) {
       } else {
         summary = text;
       }
+
+      summary = `
+# Document Summary: ${document.name}
+
+${summary}
+      `;
 
       // Create summary embeddings
       logger.info(`index:${payload.document_id}`, 'Create summary embedding');

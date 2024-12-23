@@ -270,7 +270,7 @@ async function retrieveChunks({
       logger.debug('retrieveChunks', `Semantic search yield ${semanticChunks.length} results`);
 
       // Add regular chunks
-      const regularChunks = _.filter(semanticChunks, (chunk) => chunk.type === 'chunk');
+      const regularChunks = _.filter(semanticChunks, (chunk) => (chunk.type === 'chunk' || chunk.type === 'summary'));
       const addedChunks = addUniqueChunks(regularChunks);
 
       // Register Rag Log response

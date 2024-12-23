@@ -31,7 +31,7 @@ describe('IndexDocument Worker', () => {
 
     const chunks = await factory.document.getChunks();
     expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks[0].content).toEqual('Hello world');
+    expect(chunks[0].content.trim()).toEqual(`# Document Summary: ${TOKEN}\n\nHello world`);
   });
 
   it('should index with shallow knowledge', async () => {
@@ -49,6 +49,6 @@ describe('IndexDocument Worker', () => {
 
     const chunks = await factory.document.getChunks();
     expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks[0].content).toEqual('Hello world');
+    expect(chunks[0].content.trim()).toEqual('Hello world');
   });
 });

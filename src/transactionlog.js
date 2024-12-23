@@ -20,7 +20,7 @@ async function logTransaction(req, res) {
         transactionId: req.transactionId,
         action: trimString(`${req.method} ${req.path}`, 255),
         status: `${res.statusCode}`,
-        details: _.isObject(req.body) ? obfuscate(req.body) : null,
+        details: _.isObject(req.body) ? JSON.stringify(obfuscate(req.body)) : null,
       });
     }
 

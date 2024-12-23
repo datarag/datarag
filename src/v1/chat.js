@@ -346,6 +346,7 @@ module.exports = (router) => {
       const knowledgeToPrompt = [];
 
       let datasourceIds = [];
+      let convDatasourceIds = [];
       let conversation = null;
       let turns = [];
       let classification = 'other';
@@ -441,6 +442,16 @@ module.exports = (router) => {
             datasourceResIds: payload.datasource_ids,
             conversationResId: payload.conversation_id,
           });
+        })(),
+
+        // Conversation datasources
+        (async () => {
+          if (payload.conversation_id) {
+            convDatasourceIds = await findDatasourceIds({
+              organization: req.organization,
+              conversationResId: payload.conversation_id,
+            });
+          }
         })(),
 
         // Classification
@@ -675,37 +686,66 @@ module.exports = (router) => {
           });
         }
 
-        if (!_.isEmpty(payload.turn_context)) {
+        if (!_.isEmpty(payload.turn_context) || !_.isEmpty(convDatasourceIds)) {
           const getCurrentPage = async () => {
             logger.debug('datasource:call', 'getCurrentPage');
+            logger.debug('datasource:query', payload.query);
 
             const knowledge = [];
 
-            // Limit budgets
-            let maxTokens = TURN_CONTEXT_MAXTOKENS;
-            _.each(payload.turn_context, (context) => {
-              if (!context.text) return;
-              // Text
-              const truncatedText = truncateToTokens(context.text, maxTokens);
-              maxTokens -= truncatedText.tokens;
-              const text = truncatedText.text;
-              // Metadata
-              let metadata = context.metadata || {};
-              const metadataString = JSON.stringify(metadata);
-              const truncatedMetadata = truncateToTokens(metadataString, maxTokens);
-              if (truncatedMetadata.text === metadataString) {
-                maxTokens -= truncatedMetadata.tokens;
-              } else {
-                metadata = {};
-              }
-              knowledge.push({
-                id: nanoid(),
-                text,
-                metadata,
-                datasource_id: '',
-                document_id: '',
+            // Get local context
+            if (!_.isEmpty(payload.turn_context)) {
+              // Limit budgets
+              let maxTokens = TURN_CONTEXT_MAXTOKENS;
+              _.each(payload.turn_context, (context) => {
+                if (!context.text) return;
+                // Text
+                const truncatedText = truncateToTokens(context.text, maxTokens);
+                maxTokens -= truncatedText.tokens;
+                const text = truncatedText.text;
+                // Metadata
+                let metadata = context.metadata || {};
+                const metadataString = JSON.stringify(metadata);
+                const truncatedMetadata = truncateToTokens(metadataString, maxTokens);
+                if (truncatedMetadata.text === metadataString) {
+                  maxTokens -= truncatedMetadata.tokens;
+                } else {
+                  metadata = {};
+                }
+                knowledge.push({
+                  id: nanoid(),
+                  text,
+                  metadata,
+                  datasource_id: '',
+                  document_id: '',
+                });
               });
-            });
+            } else if (!_.isEmpty(convDatasourceIds)) {
+              // Get conversation chunks
+              const { costUSD, chunks } = await retrieveChunks({
+                organization: req.organization,
+                datasourceIds: convDatasourceIds,
+                prompt: payload.query,
+                maxTokens: payload.max_tokens,
+                maxChars: payload.max_chars,
+                maxChunks: payload.max_chunks,
+                ragLog,
+              });
+              queryCostUSD += costUSD;
+              logger.debug('datasource:memory:response', `${chunks.length} retrieved`);
+              log(`Searching memory yield ${chunks.length} chunks`);
+
+              // Add to knowledge
+              _.each(chunks, (chunk) => {
+                knowledge.push({
+                  id: nanoid(),
+                  text: chunk.text,
+                  metadata: chunk.metadata || {},
+                  datasource_id: chunk.datasource_id,
+                  document_id: chunk.document_id,
+                });
+              });
+            }
 
             return formatKnowledgeBase(knowledge);
           };
@@ -714,7 +754,7 @@ module.exports = (router) => {
             type: 'function',
             function: {
               function: getCurrentPage,
-              description: 'Get the current content the user is viewing, such as an active web page in a Chrome tab.',
+              description: 'Get the current content the user is viewing, such as an active web page or PDF, in a Chrome tab.',
               parse: JSON.parse,
             },
           });
