@@ -3,6 +3,7 @@ const _ = require('lodash');
 const { nanoid } = require('nanoid');
 const { apiRoute, notFoundResponse, badRequestResponse } = require('../helpers/responses');
 const { serializeDocument } = require('../helpers/serialize');
+const config = require('../config');
 const md5 = require('../helpers/md5');
 const db = require('../db/models');
 const { addJob } = require('../queue');
@@ -12,6 +13,7 @@ const { convertSource } = require('../helpers/converter');
 const { RESID_PREFIX_DOCUMENT } = require('../constants');
 
 const { Op } = db.Sequelize;
+const RAG_CONTENT_SALT = config.get('rag:content:salt');
 
 module.exports = (router) => {
   /**
@@ -306,7 +308,7 @@ module.exports = (router) => {
         content,
         contentSource,
         contentType: payload.type,
-        contentHash: md5(content),
+        contentHash: md5(`${RAG_CONTENT_SALT}:${content}`),
         contentSize: content.length,
         metadata: payload.metadata || {},
       };

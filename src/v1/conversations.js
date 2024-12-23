@@ -16,6 +16,7 @@ const indexDocument = require('../queue/jobs/indexDocument');
 const { RESID_PREFIX_CONVERSATION, RESID_PREFIX_CONVERSATION_DOCUMENT } = require('../constants');
 
 const MAX_CONVERSATIONS = config.get('chat:max:conversations');
+const RAG_CONTENT_SALT = config.get('rag:content:salt');
 
 module.exports = (router) => {
   /**
@@ -642,7 +643,7 @@ module.exports = (router) => {
         content,
         contentSource,
         contentType: payload.type,
-        contentHash: md5(content),
+        contentHash: md5(`${RAG_CONTENT_SALT}:${content}`),
         contentSize: content.length,
         metadata: payload.metadata || {},
         status: 'queued',
@@ -664,7 +665,6 @@ module.exports = (router) => {
 
         await indexDocument({
           document_id: document.id,
-          knowledge: 'shallow',
         });
       }
 

@@ -79,6 +79,9 @@ nconf.set('raglog:retentiondays', getEnvironment('DATARAG_RAGLOG_RETENTIONDAYS',
 // Embeddings cache retention
 nconf.set('embeddings:retentiondays', getEnvironment('DATARAG_EMBEDDINGS_RETENTIONDAYS', 60));
 
+// RAG content hash salt
+nconf.set('rag:content:salt', getEnvironment('DATARAG_RAG_CONTENT_SALT', 'v1'));
+
 // LLM costs
 nconf.set('llm:pricing', {
   // OpenAI per token pricing
